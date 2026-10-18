@@ -32,6 +32,7 @@ def copy_dataset_locally():
         logging.info(json.dumps(row_data, indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     copy_dataset_locally()
 
 

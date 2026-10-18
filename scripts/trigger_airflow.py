@@ -2,6 +2,7 @@ import requests
 import os
 import sys
 import json
+import logging
 from datetime import datetime, timezone
 
 # ------------------------------------------------------------------
@@ -14,7 +15,7 @@ DAG_ID = os.getenv("DAG_ID", "github_ec2_ml_training")
 GIT_HASH = sys.argv[1] if len(sys.argv) > 1 else "main"
 
 if not AIRFLOW_URL:
-    print("❌ Error: AIRFLOW_URL env var is missing")
+    logging.info("❌ Error: AIRFLOW_URL env var is missing")
     sys.exit(1)
 
 # Common headers (Essential for Ngrok)
@@ -28,7 +29,7 @@ def get_jwt_token():
     Step 1: Authenticate and get the JWT Token
     """
     auth_url = f"{AIRFLOW_URL}/auth/token"
-    print(f"🔑 Authenticating with {auth_url}...")
+    logging.info(f"🔑 Authenticating with {auth_url}...")
     
     try:
         # Airflow 3 usually expects Basic Auth or JSON to issue the token
@@ -39,7 +40,7 @@ def get_jwt_token():
         
         # If JSON body fails, fallback to Basic Auth (legacy compat)
         if response.status_code in [401, 422]:
-            print("   -> JSON Auth failed, trying Basic Auth...")
+            logging.info("   -> JSON Auth failed, trying Basic Auth...")
             response = requests.post(auth_url, auth=(USERNAME, PASSWORD), headers=HEADERS, timeout=10)
 
         response.raise_for_status()
@@ -47,12 +48,12 @@ def get_jwt_token():
         if not token:
             raise Exception("No access_token found in response")
         
-        print("✅ Authentication Successful")
+        logging.info("✅ Authentication Successful")
         return token
         
     except Exception as e:
-        print(f"❌ Auth Failed: {e}")
-        print(f"Response Body: {response.text if 'response' in locals() else 'None'}")
+        logging.info(f"❌ Auth Failed: {e}")
+        logging.info(f"Response Body: {response.text if 'response' in locals() else 'None'}")
         sys.exit(1)
 
 def trigger_dag(token):
@@ -63,7 +64,7 @@ def trigger_dag(token):
     # We try the standard V1 endpoint first.
     trigger_url = f"{AIRFLOW_URL}/api/v2/dags/{DAG_ID}/dagRuns"
     
-    print(f"🚀 Triggering DAG: {DAG_ID}")
+    logging.info(f"🚀 Triggering DAG: {DAG_ID}")
     
     # Add the Bearer Token to headers
     auth_headers = HEADERS.copy()
@@ -80,13 +81,14 @@ def trigger_dag(token):
     try:
         response = requests.post(trigger_url, json=payload, headers=auth_headers, timeout=10)
         response.raise_for_status()
-        print(f"✅ Success! Run ID: {response.json().get('dag_run_id')}")
+        logging.info(f"✅ Success! Run ID: {response.json().get('dag_run_id')}")
         
     except Exception as e:
-        print(f"❌ Trigger Failed: {e}")
-        print(f"Response Body: {response.text if 'response' in locals() else 'None'}")
+        logging.info(f"❌ Trigger Failed: {e}")
+        logging.info(f"Response Body: {response.text if 'response' in locals() else 'None'}")
         sys.exit(1)
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     jwt = get_jwt_token()
     trigger_dag(jwt)
