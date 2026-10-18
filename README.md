@@ -4,9 +4,10 @@
 
 ```commandline
 uv venv --python 3.13.2
+source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
-Copy training data set locally :
+Copy training dataset locally :
 
 ```commandline
 uv run ./scripts/load_dataset.py
