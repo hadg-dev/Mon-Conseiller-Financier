@@ -1,0 +1,41 @@
+Tools & Setup
+
+To build this end-to-end pipeline, you will need accounts on several services.
+Most of them offer free tiers, and the pipeline is designed to stay within free usage.
+
+Here is the full list:
+
+    AWS Account
+    👉 Needed to create EC2 instances and store models in S3 via MLflow
+    https://aws.amazon.com/free
+
+    NeonDB Account
+    👉 Free PostgreSQL database hosting, used to store MLflow’s backend state
+    https://neon.tech
+
+    Hugging Face Account
+    👉 We’ll deploy the MLflow server on Hugging Face Spaces
+    https://huggingface.co/join
+
+    Docker & Docker Hub
+    👉 We build Docker images and push them to Docker Hub
+    Docker: https://www.docker.com
+    Docker Hub: https://hub.docker.com/signup
+
+    NGROK Account
+    👉 Creates a secure public endpoint so GitHub Actions can talk to your local Airflow
+    https://ngrok.com/signup
+
+    GitHub Account
+    👉 Stores your training code + triggers GitHub Actions workflows
+    https://github.com/signup
+
+    Python environment + Docker Compose
+    👉 Needed to run Airflow locally
+    Docker Compose install guide: https://docs.docker.com/compose/install
+
+setup process
+https://app.jedha.co/course/m04-d03-continuous-training-ail/mlflow-server-to-huggingface-ail
+https://app.jedha.co/course/m04-d03-continuous-training-ail/training-script-and-github-action-ail
+https://app.jedha.co/course/m04-d03-continuous-training-ail/airflow-server-to-production-ail
+https://app.jedha.co/course/m04-d03-continuous-training-ail/start-mlops-pipeline-project-ail

@@ -1,0 +1,77 @@
+name: Continuous Training Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  repository_dispatch:
+    types: [trigger-training]
+  workflow_dispatch:
+
+jobs:
+  # ==============================================================================
+  # JOB 1: BUILD, TEST & PUSH (The "Artifact Factory")
+  # ==============================================================================
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker Image
+        # We tag it with the Commit SHA (for precise versioning) AND 'latest'
+        run: |
+          IMAGE_ID=${{ secrets.DOCKER_USERNAME }}/sample-ml-workflow
+          
+          docker build -t $IMAGE_ID:${{ github.sha }} .
+          docker tag $IMAGE_ID:${{ github.sha }} $IMAGE_ID:latest
+
+      - name: Run Tests in Docker
+        # We test the EXACT image we just built. 
+        # If this fails, we never push to Docker Hub.
+        run: |
+          IMAGE_ID=${{ secrets.DOCKER_USERNAME }}/sample-ml-workflow
+          
+          docker run --rm \
+            -e MLFLOW_TRACKING_URI="file:///tmp/mlruns" \
+            $IMAGE_ID:${{ github.sha }} \
+            python -m pytest tests/
+
+      - name: Push to Docker Hub
+        # Only push if tests passed AND we are on the main branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          IMAGE_ID=${{ secrets.DOCKER_USERNAME }}/sample-ml-workflow
+          
+          docker push $IMAGE_ID:${{ github.sha }}
+          docker push $IMAGE_ID:latest
+
+  # ==============================================================================
+  # JOB 2: TRIGGER AIRFLOW (Optional - if you have the bridge)
+  # ==============================================================================
+  trigger-airflow:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Python Dependencies
+        run: pip install requests
+
+      - name: Trigger Airflow DAG
+        env:
+          AIRFLOW_URL: ${{ secrets.AIRFLOW_URL }}
+          AIRFLOW_USER: ${{ secrets.AIRFLOW_USERNAME }}
+          AIRFLOW_PASS: ${{ secrets.AIRFLOW_PASSWORD }}
+          DAG_ID: "github_ec2_ml_training"
+        run: |
+          # Run the python script, passing the commit hash as an argument
+          python scripts/trigger_airflow.py ${{ github.sha }}
