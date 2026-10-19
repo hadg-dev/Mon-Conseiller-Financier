@@ -39,3 +39,6 @@ https://app.jedha.co/course/m04-d03-continuous-training-ail/mlflow-server-to-hug
 https://app.jedha.co/course/m04-d03-continuous-training-ail/training-script-and-github-action-ail
 https://app.jedha.co/course/m04-d03-continuous-training-ail/airflow-server-to-production-ail
 https://app.jedha.co/course/m04-d03-continuous-training-ail/start-mlops-pipeline-project-ail
+
+integrate monitoring in DAG airflow
+https://app.jedha.co/course/m04-d04-continuous-monitoring-ail/build-your-monitoring-dag-ail

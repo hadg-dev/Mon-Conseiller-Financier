@@ -7,10 +7,15 @@ uv venv --python 3.13.2
 source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
-Copy training dataset locally :
 
+Copy training dataset locally :
 ```commandline
-uv run ./scripts/load_dataset.py
+uv run ./scripts/fetch_dataset.py
+```
+
+Execute training locally :
+```commandline
+uv run ./app/train.py
 ```
 
 ## Structure
@@ -26,7 +31,7 @@ uv run ./scripts/load_dataset.py
 │   └── continuous_training.txt
 │   └── projet_v2.md
 ├── scripts/
-│   └── load_dataset.py
+│   └── fetch_dataset.py
 │   └── trigger_airflow.py
 ├── Dockerfile
 ├── README.md

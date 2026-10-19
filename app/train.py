@@ -9,12 +9,12 @@ from trl import SFTTrainer, SFTConfig
 import pandas as pd
 from datasets import Dataset
 
-DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
-MLFLOW_ENABLED = False
+#DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
 NB_EPOCHS = 10
 LEARNING_RATE = 0.01
 MODEL_NAME = "Qwen/Qwen3.5-4B"
 DATASET_DIR = "../dataset"
+TRAINED_OUTPUT_DIR = "../lora/output"
 TRAINED_LORA_DIR = "../lora/adapter"
 TRAINED_TOKENIZER_DIR = "../lora/tokenizer"
 TRAINING_SYSTEM_PROMPT = "You are an expert, empathetic, and highly analytical Personal Financial Advisor. Your mission is to help the user master their money, optimize their budget, eliminate debt, invest wisely, and build long-term wealth."
@@ -46,26 +46,16 @@ def prepare_chat_dataset(df: pd.DataFrame, tokenizer: AutoTokenizer) -> Dataset:
     hf_dataset_rpw_mapped = hf_dataset.map(format_row, remove_columns=["messages"])
     return hf_dataset_rpw_mapped
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-
+def parse_args():
     # 1. Parse ONLY Model Hyperparameters
     parser = argparse.ArgumentParser(description="Financial Advisor Training Script")
     # TODO
     #parser.add_argument("--n_estimators", type=int, default=20)
     #parser.add_argument("--criterion", type=str, default="squared_error")
     #parser.add_argument("--experiment_name", type=str, default="california_housing")
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    if REPORT_TRAINING_TO=="mlflow":
-        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
-        mlflow.set_experiment(args.experiment_name)
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    if device == "cpu":
-        logging.warning("Warning: No GPU found.")
-    logging.info(f"Device: {device}")
-
+def load_model_from_hf():
     compute_dtype = torch.float16  # Use torch.float16 on a T4. Newer cards can use torch.bfloat16.
 
     bnb_config = BitsAndBytesConfig(
@@ -75,34 +65,55 @@ if __name__ == "__main__":
         bnb_4bit_compute_dtype=compute_dtype,
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+    _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
+    if _tokenizer.pad_token is None:
+        _tokenizer.pad_token = _tokenizer.eos_token
 
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_NAME,
-        quantization_config=bnb_config,
-        device_map=device
-    )
-
-    memory = torch.cuda.memory_allocated() / 1e9
-    logging.info(f"GPU memory in use : {memory:.2f} GB")
-
-    model = AutoModelForCausalLM.from_pretrained(
+    _model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         quantization_config=bnb_config,
         device_map=device,
         trust_remote_code=True,
     )
-    model = prepare_model_for_kbit_training(model)
+    _model = prepare_model_for_kbit_training(_model)
 
+    memory = torch.cuda.memory_allocated() / 1e9
+    logging.info(f"GPU memory in use : {memory:.2f} GB")
+
+    return _model, _tokenizer
+
+def load_dataset():
     target_file = next(f for f in os.listdir(DATASET_DIR) if f.endswith((".jsonl")))
     target_file_path = os.path.join(DATASET_DIR, target_file)
-    train_data = pd.read_json(target_file_path, lines=target_file_path.endswith(".jsonl"))
+    _train_data = pd.read_json(target_file_path, lines=target_file_path.endswith(".jsonl"))
+    return _train_data
 
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
+    # Arguments
+    args = parse_args()
+
+    # setup ML Flow
+    if REPORT_TRAINING_TO == "mlflow":
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
+        mlflow.set_experiment(args.experiment_name)
+
+    # Set device
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if device == "cpu":
+        logging.warning("Warning: No GPU found.")
+    logging.info(f"Device: {device}")
+
+    # Load model and related tokenizer
+    model, tokenizer = load_model_from_hf()
+
+    # Load Daatset
+    train_data = load_dataset()
     train_dataset = prepare_chat_dataset(train_data, tokenizer)
 
-    # LoRA adapter setup
+    # Lora training
     lora_config = LoraConfig(
         r=16,
         lora_alpha=32,
@@ -116,7 +127,7 @@ if __name__ == "__main__":
     use_fp16 = not use_bf16 and device == "cuda"
 
     sft_config = SFTConfig(
-        output_dir="financial-model-training",
+        output_dir=TRAINED_OUTPUT_DIR,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
         gradient_checkpointing=True,

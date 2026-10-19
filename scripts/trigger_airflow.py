@@ -5,6 +5,9 @@ import json
 import logging
 from datetime import datetime, timezone
 
+# voir config/airflow.cfg
+# deplacer le script dans dags/ ?
+
 # ------------------------------------------------------------------
 # CONFIGURATION
 # ------------------------------------------------------------------
