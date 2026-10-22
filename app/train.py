@@ -4,9 +4,8 @@ import mlflow.sklearn
 import torch
 import json
 import logging
-from pandas import DataFrame
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, PreTrainedModel, PreTrainedTokenizerBase
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, PeftModel
+from peft import LoraConfig, prepare_model_for_kbit_training, PeftModel
 from trl import SFTTrainer, SFTConfig
 import pandas as pd
 from datasets import Dataset
@@ -14,7 +13,7 @@ from datasets import Dataset
 # reference https://app.jedha.co/course/m02-d01-gpu-architecture-and-optimization-ail/finetune-llama-8b-ail
 #DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
 
-DEFAULT_NB_EPOCHS = 6
+DEFAULT_NB_EPOCHS = 4
 DEFAULT_LEARNING_RATE = 2e-4
 DEFAULT_MODEL_NAME = "Qwen/Qwen3.5-4B"  # Qwen/Qwen3.5-9B , Qwen/Qwen3.8-27B
 DEFAULT_REPORT_TRAINING_TO = "none" # "mlflow", "none"
@@ -38,14 +37,15 @@ def parse_args() -> argparse.Namespace:
     logging.info(_args)
     return _args
 
-def load_dataset() -> DataFrame:
+def load_and_format_dataset(formatting_tokenizer: PreTrainedTokenizerBase) -> Dataset:
     target_file = next(f for f in os.listdir(DATASET_DIR) if f.endswith((".jsonl")))
     target_file_path = os.path.join(DATASET_DIR, target_file)
-    _train_data = pd.read_json(target_file_path, lines=target_file_path.endswith(".jsonl"))
-    return _train_data
+    logging.info(f"Loading dataset from {target_file_path}")
+    train_data = pd.read_json(target_file_path, lines=target_file_path.endswith(".jsonl"))
 
-def load_and_format_dataset(formatting_tokenizer: PreTrainedTokenizerBase) -> Dataset:
-    train_data = load_dataset()
+    logging.info(f"Loaded {len(train_data):,} rows.")
+    columns = train_data.columns.tolist()
+    logging.info(f"Columns ({len(columns)}): {', '.join(columns)}")
 
     def format_row(row):
         if isinstance(row, str):
@@ -79,19 +79,12 @@ def load_and_format_dataset(formatting_tokenizer: PreTrainedTokenizerBase) -> Da
     _formatted_dataset = Dataset.from_dict({"text": _formatted})
     return _formatted_dataset
 
-def load_model_from_hf(model_name, device_map) -> tuple[PreTrainedModel | PeftModel, PreTrainedTokenizerBase] :
-    logging.info(f"Loading model and tokenizer for {model_name}")
+def load_model_from_hf(model_name: str, device_map: str, use_bf16: bool) -> tuple[PreTrainedModel | PeftModel, PreTrainedTokenizerBase] :
+    logging.info(f"Loading model and tokenizer for {model_name}...")
 
-    compute_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-
-    if device_map == "cpu":
-        _model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            device_map=device_map,
-            trust_remote_code=True,
-        )
-    else:
-        logging.info(f"Loading model with bnb quantization")
+    if device_map == "cuda":
+        compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
+        logging.info(f"Loading model with bnb quantization and compute dtype {compute_dtype}")
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
@@ -104,6 +97,14 @@ def load_model_from_hf(model_name, device_map) -> tuple[PreTrainedModel | PeftMo
             device_map=device_map,
             trust_remote_code=True,
         )
+    elif device_map == "cpu":
+        _model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            device_map=device_map,
+            trust_remote_code=True,
+        )
+    else:
+        raise Exception(f'Unsupported device {device_map}')
 
     _model = prepare_model_for_kbit_training(_model)
 
@@ -116,13 +117,17 @@ def load_model_from_hf(model_name, device_map) -> tuple[PreTrainedModel | PeftMo
 
     return _model, _tokenizer
 
-def train(lr: float,
-          nb_epochs: int,
-          training_model: PreTrainedModel | PeftModel,
-          training_tokenizer: PreTrainedTokenizerBase,
-          training_dataset: Dataset,
-          report_training: str
-          ) -> None:
+def train(
+        lr: float,
+        nb_epochs: int,
+        training_model: PreTrainedModel | PeftModel,
+        training_tokenizer: PreTrainedTokenizerBase,
+        training_dataset: Dataset,
+        report_training: str,
+        use_bf16: bool,
+        use_fp16: bool
+) -> None:
+
     lora_config = LoraConfig(
         r=16,
         lora_alpha=32,
@@ -131,9 +136,6 @@ def train(lr: float,
         task_type="CAUSAL_LM",
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
     )
-
-    use_bf16 = torch.cuda.is_bf16_supported()
-    use_fp16 = not use_bf16 and device == "cuda"
 
     sft_config = SFTConfig(
         output_dir=TRAINED_OUTPUT_DIR,
@@ -195,8 +197,12 @@ if __name__ == "__main__":
         logging.warning("Warning: No GPU found.")
     logging.info(f"Device: {device}")
 
+    # check bf16 / fp16
+    bf16_supported = torch.cuda.is_bf16_supported()
+    fp16_supported = not bf16_supported and device == "cuda"
+
     # Load model and related tokenizer
-    model, tokenizer = load_model_from_hf(model_name=args.model_name, device_map=device)
+    model, tokenizer = load_model_from_hf(model_name=args.model_name, device_map=device, use_bf16=bf16_supported)
 
     # Load Dataset
     formatted_dataset = load_and_format_dataset(tokenizer)
@@ -208,5 +214,7 @@ if __name__ == "__main__":
         training_model=model,
         training_tokenizer=tokenizer,
         training_dataset=formatted_dataset,
-        report_training=args.report_training
+        report_training=args.report_training,
+        use_bf16=bf16_supported,
+        use_fp16=fp16_supported,
     )
