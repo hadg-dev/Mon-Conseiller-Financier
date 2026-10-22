@@ -9,7 +9,7 @@ from transformers import (
     TextIteratorStreamer,
 )
 
-TRAINED_LORA_DIR = "../lora/adapter"
+TRAINED_LORA_DIR = "../../output/adapter"
 MODEL_NAME = "Qwen/Qwen3.5-4B"
 
 SYSTEM_PROMPT = """

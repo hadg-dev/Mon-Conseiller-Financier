@@ -10,7 +10,6 @@ from trl import SFTTrainer, SFTConfig
 import pandas as pd
 from datasets import Dataset
 
-# reference https://app.jedha.co/course/m02-d01-gpu-architecture-and-optimization-ail/finetune-llama-8b-ail
 #DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
 
 DEFAULT_NB_EPOCHS = 4
@@ -18,10 +17,10 @@ DEFAULT_LEARNING_RATE = 2e-4
 DEFAULT_MODEL_NAME = "Qwen/Qwen3.5-4B"  # Qwen/Qwen3.5-9B , Qwen/Qwen3.8-27B
 DEFAULT_REPORT_TRAINING_TO = "none" # "mlflow", "none", "all"
 
-DATASET_DIR = "../dataset"
-TRAINED_OUTPUT_DIR = "../lora/output"
-TRAINED_LORA_DIR = "../lora/adapter"
-TRAINED_TOKENIZER_DIR = "../lora/tokenizer"
+DATASET_DIR = "../../dataset"
+TRAINED_OUTPUT_DIR = "../../output/trainer"
+TRAINED_LORA_DIR = "../../output/adapter"
+TRAINED_TOKENIZER_DIR = "../../output/tokenizer"
 TRAINING_SYSTEM_PROMPT = "You are an expert and highly analytical Personal Financial Advisor. Your mission is to help the user master their money, optimize their budget, eliminate debt, invest wisely, and build long-term wealth."
 
 def parse_args() -> argparse.Namespace:

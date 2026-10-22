@@ -5,7 +5,7 @@ import pandas as pd
 from huggingface_hub import snapshot_download, login
 
 DEBUG = True
-DATASET_DIR = "../dataset"
+DATASET_DIR = "../../dataset"
 DATASET_REPOD_ID = "likhitjuttada/finance-reasoning-sft-dataset"
 DATASET_PATTERNS = ["combined_train.jsonl"]
 

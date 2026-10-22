@@ -10,34 +10,27 @@ uv pip install -r requirements.txt
 
 Copy training dataset locally :
 ```commandline
-uv run ./scripts/fetch_dataset.py
+uv run ./src/data/fetch_dataset.py
 ```
 
 Execute training locally :
 ```commandline
-uv run ./app/train.py
+uv run ./src/train/train.py
 ```
 
-## Structure
+## Structure 
 
-```
-./
-├── .github/workflows/
-│   └── cml.yaml
-├── app/
-│   └── train.py
-├── dataset/
-├── doc/
-│   └── continuous_training.txt
-│   └── projet_v2.md
-├── scripts/
-│   └── fetch_dataset.py
-│   └── trigger_airflow.py
-├── Dockerfile
-├── README.md
-├── requirements.txt
-└── requirements-rocm.txt
-```
+- **.github/workflows/** contains Github Actions
+- **airflow/** contains Airflow Docker compose and DAG
+- **configs/**
+- **dataset/**
+- **doc/**
+- **docker/** Docker file for training image
+- **src/** Python scripts
+  - **src/airflow/trigger_airflow.py** triggered by github action to send image hash to Airflow  
+  - **src/data/fetch_dataset.py**
+  - **src/train/train.py** Training script
+- **tests/** 
 
 ## Industrialization pipeline
 

@@ -16,6 +16,7 @@ fastapi
 uvicorn
 pydantic
 openai
+paramiko
 
 # ML Flow
 mlflow==3.5.0

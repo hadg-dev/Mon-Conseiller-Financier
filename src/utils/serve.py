@@ -16,8 +16,8 @@ import uvicorn
 #       "max_new_tokens": 400
 #     }'
 
-TRAINED_LORA_DIR = "../lora/adapter"
-TRAINED_TOKENIZER_DIR = "../lora/tokenizer"
+TRAINED_LORA_DIR = "../../output/adapter"
+TRAINED_TOKENIZER_DIR = "../../output/tokenizer"
 MODEL_NAME = "Qwen/Qwen3.5-4B"
 
 model = None

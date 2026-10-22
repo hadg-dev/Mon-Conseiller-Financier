@@ -42,3 +42,9 @@ https://app.jedha.co/course/m04-d03-continuous-training-ail/start-mlops-pipeline
 
 integrate monitoring in DAG airflow
 https://app.jedha.co/course/m04-d04-continuous-monitoring-ail/build-your-monitoring-dag-ail
+
+Training model
+https://app.jedha.co/course/m02-d01-gpu-architecture-and-optimization-ail/finetune-llama-8b-ail
+
+Airflow DAG
+https://app.jedha.co/course/m03-d03-introduction-to-airflow-ail/build-your-first-dag-ail
