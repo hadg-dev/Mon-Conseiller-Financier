@@ -5,7 +5,7 @@ import torch
 import json
 import logging
 from pandas import DataFrame
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TokenizersBackend, SentencePieceBackend, PreTrainedModel
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, PreTrainedModel, PreTrainedTokenizerBase
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, PeftModel
 from trl import SFTTrainer, SFTConfig
 import pandas as pd
@@ -34,7 +34,13 @@ def parse_args():
     parser.add_argument("--learning_rate", type=float, default=DEFAULT_LEARNING_RATE)
     return parser.parse_args()
 
-def load_and_format_dataset(formatting_tokenizer: TokenizersBackend | SentencePieceBackend) -> Dataset:
+def load_dataset() -> DataFrame:
+    target_file = next(f for f in os.listdir(DATASET_DIR) if f.endswith((".jsonl")))
+    target_file_path = os.path.join(DATASET_DIR, target_file)
+    _train_data = pd.read_json(target_file_path, lines=target_file_path.endswith(".jsonl"))
+    return _train_data
+
+def load_and_format_dataset(formatting_tokenizer: PreTrainedTokenizerBase) -> Dataset:
     train_data = load_dataset()
 
     def format_row(row):
@@ -69,7 +75,7 @@ def load_and_format_dataset(formatting_tokenizer: TokenizersBackend | SentencePi
     _formatted_dataset = Dataset.from_dict({"text": _formatted})
     return _formatted_dataset
 
-def load_model_from_hf(model_name, device_map) -> tuple[PreTrainedModel | PeftModel, TokenizersBackend | SentencePieceBackend] :
+def load_model_from_hf(model_name, device_map) -> tuple[PreTrainedModel | PeftModel, PreTrainedTokenizerBase] :
     logging.info(f"Loading model and tokenizer for {model_name}")
 
     compute_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -106,16 +112,10 @@ def load_model_from_hf(model_name, device_map) -> tuple[PreTrainedModel | PeftMo
 
     return _model, _tokenizer
 
-def load_dataset() -> DataFrame:
-    target_file = next(f for f in os.listdir(DATASET_DIR) if f.endswith((".jsonl")))
-    target_file_path = os.path.join(DATASET_DIR, target_file)
-    _train_data = pd.read_json(target_file_path, lines=target_file_path.endswith(".jsonl"))
-    return _train_data
-
 def train(lr: float,
           nb_epochs: int,
           training_model: PreTrainedModel | PeftModel,
-          training_tokenizer: TokenizersBackend | SentencePieceBackend,
+          training_tokenizer: PreTrainedTokenizerBase,
           training_dataset: Dataset
           ) -> None:
     lora_config = LoraConfig(
@@ -169,8 +169,9 @@ def train(lr: float,
     trainer.train()
 
     trainer.model.save_pretrained(TRAINED_LORA_DIR)
+    logging.info(f"Training finished. Adapter weights saved to {TRAINED_LORA_DIR}")
     training_tokenizer.save_pretrained(TRAINED_TOKENIZER_DIR)
-    logging.info("Training finished. Adapter weights saved to 'financial-model-training/final_adapter'.")
+    logging.info(f"Tokenizer saved to {TRAINED_TOKENIZER_DIR}")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
