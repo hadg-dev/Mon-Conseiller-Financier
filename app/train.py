@@ -16,7 +16,7 @@ from datasets import Dataset
 DEFAULT_NB_EPOCHS = 4
 DEFAULT_LEARNING_RATE = 2e-4
 DEFAULT_MODEL_NAME = "Qwen/Qwen3.5-4B"  # Qwen/Qwen3.5-9B , Qwen/Qwen3.8-27B
-DEFAULT_REPORT_TRAINING_TO = "none" # "mlflow", "none"
+DEFAULT_REPORT_TRAINING_TO = "none" # "mlflow", "none", "all"
 
 DATASET_DIR = "../dataset"
 TRAINED_OUTPUT_DIR = "../lora/output"
@@ -98,6 +98,7 @@ def load_model_from_hf(model_name: str, device_map: str, use_bf16: bool) -> tupl
             trust_remote_code=True,
         )
     elif device_map == "cpu":
+        logging.info(f"Loading model to cpu")
         _model = AutoModelForCausalLM.from_pretrained(
             model_name,
             device_map=device_map,
@@ -133,7 +134,7 @@ def train(
         lora_alpha=32,
         lora_dropout=0.05,
         bias="none",
-        task_type="CAUSAL_LM",
+        task_type="CAUSAL_LM",  # TODO QUESTION_ANS ?
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
     )
 
@@ -164,7 +165,7 @@ def train(
             processing_class=training_tokenizer,
         )
     except TypeError:
-        logging.warning("SFTTrainer instanciation failed, retrying with with fixed tokenizer")
+        logging.warning("SFTTrainer instanciation failed, retrying with alternative func signature")
         trainer = SFTTrainer(
             model=training_model,
             args=sft_config,
@@ -207,7 +208,7 @@ if __name__ == "__main__":
     # Load Dataset
     formatted_dataset = load_and_format_dataset(tokenizer)
 
-    # Lora training
+    # Run Lora training
     train(
         lr=args.learning_rate,
         nb_epochs=args.nb_epochs,
