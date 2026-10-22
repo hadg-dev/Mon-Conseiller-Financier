@@ -12,19 +12,20 @@ import pandas as pd
 from datasets import Dataset
 
 # reference https://app.jedha.co/course/m02-d01-gpu-architecture-and-optimization-ail/finetune-llama-8b-ail
-
 #DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
+
 DEFAULT_NB_EPOCHS = 6
 DEFAULT_LEARNING_RATE = 2e-4
 DEFAULT_MODEL_NAME = "Qwen/Qwen3.5-4B"  # Qwen/Qwen3.5-9B , Qwen/Qwen3.8-27B
+DEFAULT_REPORT_TRAINING_TO = "none" # "mlflow", "none"
+
 DATASET_DIR = "../dataset"
 TRAINED_OUTPUT_DIR = "../lora/output"
 TRAINED_LORA_DIR = "../lora/adapter"
 TRAINED_TOKENIZER_DIR = "../lora/tokenizer"
 TRAINING_SYSTEM_PROMPT = "You are an expert and highly analytical Personal Financial Advisor. Your mission is to help the user master their money, optimize their budget, eliminate debt, invest wisely, and build long-term wealth."
-REPORT_TRAINING_TO = "none" # "mlflow", "none"
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Financial Advisor Training Script")
     #parser.add_argument("--n_estimators", type=int, default=20)
     #parser.add_argument("--criterion", type=str, default="squared_error")
@@ -32,7 +33,10 @@ def parse_args():
     parser.add_argument("--nb_epochs", type=int, default=DEFAULT_NB_EPOCHS)
     parser.add_argument("--model_name", type=str, default=DEFAULT_MODEL_NAME)
     parser.add_argument("--learning_rate", type=float, default=DEFAULT_LEARNING_RATE)
-    return parser.parse_args()
+    parser.add_argument("--report_training", type=str, default=DEFAULT_REPORT_TRAINING_TO)
+    _args = parser.parse_args()
+    logging.info(_args)
+    return _args
 
 def load_dataset() -> DataFrame:
     target_file = next(f for f in os.listdir(DATASET_DIR) if f.endswith((".jsonl")))
@@ -116,7 +120,8 @@ def train(lr: float,
           nb_epochs: int,
           training_model: PreTrainedModel | PeftModel,
           training_tokenizer: PreTrainedTokenizerBase,
-          training_dataset: Dataset
+          training_dataset: Dataset,
+          report_training: str
           ) -> None:
     lora_config = LoraConfig(
         r=16,
@@ -145,7 +150,7 @@ def train(lr: float,
         save_strategy="epoch",
         fp16=use_fp16,
         bf16=use_bf16,
-        report_to=REPORT_TRAINING_TO,
+        report_to=report_training,
     )
 
     try:
@@ -180,7 +185,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     # setup ML Flow
-    if REPORT_TRAINING_TO == "mlflow":
+    if args.report_training == "mlflow":
         mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
         mlflow.set_experiment(args.experiment_name)
 
@@ -197,4 +202,11 @@ if __name__ == "__main__":
     formatted_dataset = load_and_format_dataset(tokenizer)
 
     # Lora training
-    train(lr=args.learning_rate, nb_epochs=args.nb_epochs, training_model=model, training_tokenizer=tokenizer, training_dataset=formatted_dataset)
+    train(
+        lr=args.learning_rate,
+        nb_epochs=args.nb_epochs,
+        training_model=model,
+        training_tokenizer=tokenizer,
+        training_dataset=formatted_dataset,
+        report_training=args.report_training
+    )
