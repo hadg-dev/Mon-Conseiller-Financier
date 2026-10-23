@@ -10,23 +10,15 @@ from trl import SFTTrainer, SFTConfig
 import pandas as pd
 from datasets import Dataset
 
+from utils.utils import dataset_root, output_root
 from configuration.config import load_config
 
 #DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
 
-#DEFAULT_NB_EPOCHS = 4
-#DEFAULT_LEARNING_RATE = 2e-4
-#DEFAULT_MODEL_NAME = "Qwen/Qwen3.5-4B"  # Qwen/Qwen3.5-9B , Qwen/Qwen3.8-27B
-#DEFAULT_REPORT_TRAINING_TO = "none" # "mlflow", "none", "all"
-
-DATASET_DIR = "../../dataset"
-TRAINED_OUTPUT_DIR = "../../output/trainer"
-TRAINED_LORA_DIR = "../../output/adapter"
-TRAINED_TOKENIZER_DIR = "../../output/tokenizer"
 TRAINING_SYSTEM_PROMPT = "You are an expert and highly analytical Personal Financial Advisor. Your mission is to help the user master their money, optimize their budget, eliminate debt, invest wisely, and build long-term wealth."
 
 def parse_args() -> argparse.Namespace:
-    conf = load_config()
+    conf = load_config().defaults
     parser = argparse.ArgumentParser(description="Financial Advisor Training Script")
     #parser.add_argument("--n_estimators", type=int, default=20)
     #parser.add_argument("--criterion", type=str, default="squared_error")
@@ -40,8 +32,9 @@ def parse_args() -> argparse.Namespace:
     return _args
 
 def load_and_format_dataset(formatting_tokenizer: PreTrainedTokenizerBase) -> Dataset:
-    target_file = next(f for f in os.listdir(DATASET_DIR) if f.endswith((".jsonl")))
-    target_file_path = os.path.join(DATASET_DIR, target_file)
+    _dataset_root = dataset_root()
+    target_file = next(f for f in os.listdir(_dataset_root) if f.endswith((".jsonl")))
+    target_file_path = os.path.join(_dataset_root, target_file)
     logging.info(f"Loading dataset from {target_file_path}")
     train_data = pd.read_json(target_file_path, lines=target_file_path.endswith(".jsonl"))
 
@@ -140,8 +133,10 @@ def train(
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
     )
 
+    _sft_output_dir = f"{str(output_root(create_if_needed=True))}/sft"
+
     sft_config = SFTConfig(
-        output_dir=TRAINED_OUTPUT_DIR,
+        output_dir=_sft_output_dir,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
         gradient_checkpointing=True,
@@ -178,10 +173,13 @@ def train(
 
     trainer.train()
 
-    trainer.model.save_pretrained(TRAINED_LORA_DIR)
-    logging.info(f"Training finished. Adapter weights saved to {TRAINED_LORA_DIR}")
-    training_tokenizer.save_pretrained(TRAINED_TOKENIZER_DIR)
-    logging.info(f"Tokenizer saved to {TRAINED_TOKENIZER_DIR}")
+    _lora_output_dir = f"{str(output_root(create_if_needed=True))}/adapter"
+    trainer.model.save_pretrained(_lora_output_dir)
+    logging.info(f"Training finished. Adapter weights saved to {_lora_output_dir}")
+
+    _tokenizer_output_dir = f"{str(output_root(create_if_needed=True))}/tokenizer"
+    training_tokenizer.save_pretrained(_tokenizer_output_dir)
+    logging.info(f"Tokenizer saved to {_tokenizer_output_dir}")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
