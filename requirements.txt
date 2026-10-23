@@ -17,6 +17,7 @@ uvicorn
 pydantic
 openai
 paramiko
+pyyaml
 
 # ML Flow
 mlflow==3.5.0

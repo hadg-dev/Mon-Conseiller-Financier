@@ -10,12 +10,14 @@ from trl import SFTTrainer, SFTConfig
 import pandas as pd
 from datasets import Dataset
 
+from configuration.config import load_config
+
 #DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
 
-DEFAULT_NB_EPOCHS = 4
-DEFAULT_LEARNING_RATE = 2e-4
-DEFAULT_MODEL_NAME = "Qwen/Qwen3.5-4B"  # Qwen/Qwen3.5-9B , Qwen/Qwen3.8-27B
-DEFAULT_REPORT_TRAINING_TO = "none" # "mlflow", "none", "all"
+#DEFAULT_NB_EPOCHS = 4
+#DEFAULT_LEARNING_RATE = 2e-4
+#DEFAULT_MODEL_NAME = "Qwen/Qwen3.5-4B"  # Qwen/Qwen3.5-9B , Qwen/Qwen3.8-27B
+#DEFAULT_REPORT_TRAINING_TO = "none" # "mlflow", "none", "all"
 
 DATASET_DIR = "../../dataset"
 TRAINED_OUTPUT_DIR = "../../output/trainer"
@@ -24,14 +26,15 @@ TRAINED_TOKENIZER_DIR = "../../output/tokenizer"
 TRAINING_SYSTEM_PROMPT = "You are an expert and highly analytical Personal Financial Advisor. Your mission is to help the user master their money, optimize their budget, eliminate debt, invest wisely, and build long-term wealth."
 
 def parse_args() -> argparse.Namespace:
+    conf = load_config()
     parser = argparse.ArgumentParser(description="Financial Advisor Training Script")
     #parser.add_argument("--n_estimators", type=int, default=20)
     #parser.add_argument("--criterion", type=str, default="squared_error")
     parser.add_argument("--experiment_name", type=str, default="mon_conseiller_financier")
-    parser.add_argument("--nb_epochs", type=int, default=DEFAULT_NB_EPOCHS)
-    parser.add_argument("--model_name", type=str, default=DEFAULT_MODEL_NAME)
-    parser.add_argument("--learning_rate", type=float, default=DEFAULT_LEARNING_RATE)
-    parser.add_argument("--report_training", type=str, default=DEFAULT_REPORT_TRAINING_TO)
+    parser.add_argument("--nb_epochs", type=int, default=conf.nb_epochs)
+    parser.add_argument("--model_name", type=str, default=conf.model_name)
+    parser.add_argument("--learning_rate", type=float, default=conf.learning_rate)
+    parser.add_argument("--report_training", type=str, default=conf.report_training_to)
     _args = parser.parse_args()
     logging.info(_args)
     return _args
