@@ -20,13 +20,13 @@ def copy_dataset_locally():
         repo_id=_dataset_config.repo_id,
         local_dir=_dataset_dir,
         repo_type="dataset",
-        allow_patterns=_dataset_config.patterns,
+        allow_patterns= [_dataset_config.training_set, _dataset_config.validation_set],
     )
 
-    target_file = next(f for f in os.listdir(_dataset_dir) if f.endswith((".jsonl")))
-    target_file_path = os.path.join(_dataset_dir, target_file)
+    target_file_path = os.path.join(_dataset_dir, _dataset_config.training_set)
 
-    df = pd.read_json(target_file_path, lines=target_file_path.endswith(".jsonl"))
+    logging.info(f"Check head of {_dataset_config.training_set}")
+    df = pd.read_json(target_file_path, lines=True)
     logging.info(df.head())
 
     if DEBUG:

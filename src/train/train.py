@@ -15,6 +15,7 @@ from configuration.config import load_config
 
 #DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
 
+TRAINING_DATASET_FILE = "combined_train.jsonl"
 TRAINING_SYSTEM_PROMPT = "You are an expert and highly analytical Personal Financial Advisor. Your mission is to help the user master their money, optimize their budget, eliminate debt, invest wisely, and build long-term wealth."
 
 def parse_args() -> argparse.Namespace:
@@ -33,10 +34,11 @@ def parse_args() -> argparse.Namespace:
 
 def load_and_format_dataset(formatting_tokenizer: PreTrainedTokenizerBase) -> Dataset:
     _dataset_root = dataset_root()
-    target_file = next(f for f in os.listdir(_dataset_root) if f.endswith((".jsonl")))
-    target_file_path = os.path.join(_dataset_root, target_file)
+    target_file_path = os.path.join(_dataset_root, TRAINING_DATASET_FILE)
+    if not os.path.isfile(target_file_path):
+        raise FileNotFoundError(f"Dataset training file cannot be found : {target_file_path}")
     logging.info(f"Loading dataset from {target_file_path}")
-    train_data = pd.read_json(target_file_path, lines=target_file_path.endswith(".jsonl"))
+    train_data = pd.read_json(target_file_path, lines=True)
 
     logging.info(f"Loaded {len(train_data):,} rows.")
     columns = train_data.columns.tolist()
@@ -129,7 +131,7 @@ def train(
         lora_alpha=32,
         lora_dropout=0.05,
         bias="none",
-        task_type="CAUSAL_LM",  # TODO QUESTION_ANS ?
+        task_type="CAUSAL_LM",
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
     )
 

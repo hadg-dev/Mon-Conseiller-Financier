@@ -5,5 +5,5 @@ defaults:
     report_training_to: "none" # "mlflow", "none", "all"
 dataset:
     repo_id: "likhitjuttada/finance-reasoning-sft-dataset"
-    patterns:
-        - "combined_train.jsonl"
+    training_set: "combined_train.jsonl"
+    validation_set: "combined_val.jsonl"

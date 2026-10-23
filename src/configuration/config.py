@@ -13,7 +13,8 @@ class TrainingDefaultsConfig(BaseModel):
 
 class DatasetConfig(BaseModel):
     repo_id: str
-    patterns: list
+    training_set: str
+    validation_set: str
 
 class TrainingConfig(BaseModel):
     defaults: TrainingDefaultsConfig
