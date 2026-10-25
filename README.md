@@ -12,7 +12,8 @@ uv pip install -r requirements.txt
 Set env variable `STEPS` to a comma-separated list of required steps to execute :
 - `dataset` : fetch dataset from HF
 - `train` : train model
-- `validate` : validate model (score perplexity + score using LLM-as-judge)
+- `score_perplexity` : score perplexity of trained model
+- `score_with_llm` : score trained model using LLM-as-judge
 
 ```commandline
 uv run ./src/main.py
