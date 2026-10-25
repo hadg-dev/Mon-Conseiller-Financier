@@ -32,7 +32,8 @@ uv run ./src/main.py
   - **src/airflow/trigger_airflow.py** triggered by github action to send image hash to Airflow  
   - **src/dataset/fetch_dataset.py** fetching dataset function
   - **src/training/trainer.py** training function
-  - **src/validation/model_validation.py** gateway to validation functions 
+  - **src/validation/judge.py** score model using LLM-as-judge
+  - **src/validation/perplexity.py** score model perplexity
   - **src/main.py** main entrypoint
 - **tests/** 
 
@@ -55,7 +56,7 @@ uv run ./src/main.py
 | DOCKER_PASSWORD                                       | Docker Hub password           |
 | PERSONAL_ACCESS_TOKEN                                 | Github access token           |     
 | OPENAI_API_KEY                                        | OpenAi key for validation     |
-
+| STEPS | training script steps to run; default 'dataset,train,score_perplexity,score_with_llm'     |
 
 ## Industrialization pipeline
 

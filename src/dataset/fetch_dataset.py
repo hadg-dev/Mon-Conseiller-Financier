@@ -28,4 +28,3 @@ def fetch_dataset_from_hf(settings: Settings) -> None:
     if settings.debug:
         row_data = df.iloc[0].to_dict()
         logging.info(json.dumps(row_data, indent=2, ensure_ascii=False))
-
