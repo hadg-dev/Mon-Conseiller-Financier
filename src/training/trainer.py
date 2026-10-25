@@ -1,6 +1,4 @@
-import argparse
 import os
-import mlflow.sklearn
 import torch
 import json
 import logging
@@ -9,28 +7,26 @@ from peft import LoraConfig, prepare_model_for_kbit_training, PeftModel
 from trl import SFTTrainer, SFTConfig
 import pandas as pd
 from datasets import Dataset
-
-from utils.utils import dataset_root, output_root
-from configuration.config import load_config
+from settings import Settings
+from utils.file_utils import dataset_root, output_root
+from utils.torch_utils import get_device
 
 #DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
 
 TRAINING_DATASET_FILE = "combined_train.jsonl"
 TRAINING_SYSTEM_PROMPT = "You are an expert and highly analytical Personal Financial Advisor. Your mission is to help the user master their money, optimize their budget, eliminate debt, invest wisely, and build long-term wealth."
 
-def parse_args() -> argparse.Namespace:
-    conf = load_config().defaults
-    parser = argparse.ArgumentParser(description="Financial Advisor Training Script")
-    #parser.add_argument("--n_estimators", type=int, default=20)
-    #parser.add_argument("--criterion", type=str, default="squared_error")
-    parser.add_argument("--experiment_name", type=str, default="mon_conseiller_financier")
-    parser.add_argument("--nb_epochs", type=int, default=conf.nb_epochs)
-    parser.add_argument("--model_name", type=str, default=conf.model_name)
-    parser.add_argument("--learning_rate", type=float, default=conf.learning_rate)
-    parser.add_argument("--report_training", type=str, default=conf.report_training_to)
-    _args = parser.parse_args()
-    logging.info(_args)
-    return _args
+#def parse_args() -> argparse.Namespace:
+#    conf = load_config().defaults
+#    parser = argparse.ArgumentParser(description="Financial Advisor Training Script")
+#    parser.add_argument("--experiment_name", type=str, default="mon_conseiller_financier")
+#    parser.add_argument("--nb_epochs", type=int, default=conf.nb_epochs)
+#    parser.add_argument("--model_name", type=str, default=conf.model_name)
+#    parser.add_argument("--learning_rate", type=float, default=conf.learning_rate)
+#    parser.add_argument("--report_training", type=str, default=conf.report_training_to)
+#    _args = parser.parse_args()
+#    logging.info(_args)
+#    return _args
 
 def load_and_format_dataset(formatting_tokenizer: PreTrainedTokenizerBase) -> Dataset:
     _dataset_root = dataset_root()
@@ -183,41 +179,28 @@ def train(
     training_tokenizer.save_pretrained(_tokenizer_output_dir)
     logging.info(f"Tokenizer saved to {_tokenizer_output_dir}")
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-
-    # Arguments
-    args = parse_args()
-
-    # setup ML Flow
-    if args.report_training == "mlflow":
-        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
-        mlflow.set_experiment(args.experiment_name)
-
+def run_training(settings: Settings) -> None:
     # Set device
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    if device == "cpu":
-        logging.warning("Warning: No GPU found.")
-    logging.info(f"Device: {device}")
+    device = get_device()
 
     # check bf16 / fp16
     bf16_supported = torch.cuda.is_bf16_supported()
     fp16_supported = not bf16_supported and device == "cuda"
 
     # Load model and related tokenizer
-    model, tokenizer = load_model_from_hf(model_name=args.model_name, device_map=device, use_bf16=bf16_supported)
+    model, tokenizer = load_model_from_hf(model_name=settings.model_name, device_map=device, use_bf16=bf16_supported)
 
     # Load Dataset
     formatted_dataset = load_and_format_dataset(tokenizer)
 
     # Run Lora training
     train(
-        lr=args.learning_rate,
-        nb_epochs=args.nb_epochs,
+        lr=settings.learning_rate,
+        nb_epochs=settings.nb_epochs,
         training_model=model,
         training_tokenizer=tokenizer,
         training_dataset=formatted_dataset,
-        report_training=args.report_training,
+        report_training=settings.report_training,
         use_bf16=bf16_supported,
         use_fp16=fp16_supported,
     )

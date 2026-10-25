@@ -20,7 +20,7 @@ def dataset_root(create_if_needed: bool = True) -> Path:
         logging.info(f"Directory created : {config_dir}")
     return config_dir
 
-def output_root(create_if_needed: bool = True):
+def output_root(create_if_needed: bool = True) -> Path:
     root = project_root()
     output_dir = Path(root, "output")
     if create_if_needed and not output_dir.exists():

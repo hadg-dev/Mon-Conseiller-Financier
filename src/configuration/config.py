@@ -1,6 +1,6 @@
 from pathlib import Path
 import yaml
-from utils.utils import configuration_root
+from utils.file_utils import configuration_root
 from pydantic import BaseModel
 
 CONFIG_FILE_NAME = "training_conf.yaml"
@@ -28,6 +28,3 @@ def load_config() -> TrainingConfig:
         raw_cfg = yaml.safe_load(f)
         cfg = TrainingConfig(**raw_cfg)
         return cfg
-
-cfg = load_config()
-print(cfg)

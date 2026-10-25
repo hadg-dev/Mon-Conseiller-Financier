@@ -7,15 +7,15 @@ uv venv --python 3.13.2
 source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
+## Installation
 
-Copy training dataset locally :
-```commandline
-uv run ./src/data/fetch_dataset.py
-```
+Set env variable `STEPS` to a comma-separated list of required steps to execute :
+- `dataset` : fetch dataset from HF
+- `train` : train model
+- `validate` : validate model (score perplexity + score using LLM-as-judge)
 
-Execute training locally :
 ```commandline
-uv run ./src/train/train.py
+uv run ./src/main.py
 ```
 
 ## Structure 
@@ -23,13 +23,16 @@ uv run ./src/train/train.py
 - **.github/workflows/** contains Github Actions
 - **airflow/** contains Airflow Docker compose and DAG
 - **configs/**
+  - **configs/training_conf.yaml** default configuration used by Python training script; can be overriden by env variables 
 - **dataset/**
 - **doc/**
 - **docker/** Docker file for training image
 - **src/** Python scripts
   - **src/airflow/trigger_airflow.py** triggered by github action to send image hash to Airflow  
-  - **src/data/fetch_dataset.py**
-  - **src/train/train.py** Training script
+  - **src/dataset/fetch_dataset.py** fetching dataset function
+  - **src/training/trainer.py** training function
+  - **src/validation/model_validation.py** gateway to validation functions 
+  - **src/main.py** main entrypoint
 - **tests/** 
 
 ## Environment Variables
@@ -50,6 +53,8 @@ uv run ./src/train/train.py
 | DOCKER_USERNAME                                       | Docker Hub username           |
 | DOCKER_PASSWORD                                       | Docker Hub password           |
 | PERSONAL_ACCESS_TOKEN                                 | Github access token           |     
+| OPENAI_API_KEY                                        | OpenAi key for validation     |
+
 
 ## Industrialization pipeline
 
