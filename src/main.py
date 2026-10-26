@@ -37,6 +37,7 @@ if __name__ == "__main__":
             f"Valid options: {', '.join(steps_factory.keys())}"
         )
 
+    # Keep the steps in the order declared in steps_factory
     selected_steps = [step for step in steps_factory if step in requested_steps]
     logging.info(f"selected steps: {selected_steps}")
 

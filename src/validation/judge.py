@@ -39,7 +39,7 @@ def score_with_llm(settings: Settings):
     logging.info(f"\n--- Scoring model with LLM as judge ---")
 
     if os.getenv("OPENAI_API_KEY") is None:
-        logging.warning("no OPENAI_API_KEY configured in ev; skipping")
+        logging.warning("no OPENAI_API_KEY configured in env; skipping")
         return
 
     client = OpenAI()  # need OPENAI_API_KEY in environment

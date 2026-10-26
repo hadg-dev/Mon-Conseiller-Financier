@@ -19,4 +19,4 @@ RUN echo "===== CHECKING REQUIREMENTS =====" && \
 COPY .. .
 
 ENV PYTHONPATH=/workspace
-CMD ["python", "src/train/train.py"]
+CMD ["python", "src/main.py"]

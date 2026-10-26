@@ -11,22 +11,8 @@ from settings import Settings
 from utils.file_utils import dataset_root, output_root
 from utils.torch_utils import get_device
 
-#DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
-
 TRAINING_DATASET_FILE = "combined_train.jsonl"
 TRAINING_SYSTEM_PROMPT = "You are an expert and highly analytical Personal Financial Advisor. Your mission is to help the user master their money, optimize their budget, eliminate debt, invest wisely, and build long-term wealth."
-
-#def parse_args() -> argparse.Namespace:
-#    conf = load_config().defaults
-#    parser = argparse.ArgumentParser(description="Financial Advisor Training Script")
-#    parser.add_argument("--experiment_name", type=str, default="mon_conseiller_financier")
-#    parser.add_argument("--nb_epochs", type=int, default=conf.nb_epochs)
-#    parser.add_argument("--model_name", type=str, default=conf.model_name)
-#    parser.add_argument("--learning_rate", type=float, default=conf.learning_rate)
-#    parser.add_argument("--report_training", type=str, default=conf.report_training_to)
-#    _args = parser.parse_args()
-#    logging.info(_args)
-#    return _args
 
 def load_and_format_dataset(formatting_tokenizer: PreTrainedTokenizerBase) -> Dataset:
     _dataset_root = dataset_root()
