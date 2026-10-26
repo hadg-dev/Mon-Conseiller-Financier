@@ -15,8 +15,14 @@ Set env variable `STEPS` to a comma-separated list of required steps to execute 
 - `score_perplexity` : score perplexity of trained model
 - `score_with_llm` : score trained model using LLM-as-judge
 
+Running the training script :
 ```commandline
 uv run ./src/main.py
+```
+
+Running tests :
+```commandline
+uv run pytest
 ```
 
 ## Structure 
