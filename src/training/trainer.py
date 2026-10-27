@@ -11,12 +11,11 @@ from settings import Settings
 from utils.file_utils import dataset_root, output_root
 from utils.torch_utils import get_device
 
-TRAINING_DATASET_FILE = "combined_train.jsonl"
 TRAINING_SYSTEM_PROMPT = "You are an expert and highly analytical Personal Financial Advisor. Your mission is to help the user master their money, optimize their budget, eliminate debt, invest wisely, and build long-term wealth."
 
-def load_and_format_dataset(formatting_tokenizer: PreTrainedTokenizerBase) -> Dataset:
+def load_and_format_dataset(formatting_tokenizer: PreTrainedTokenizerBase, training_dataset: str) -> Dataset:
     _dataset_root = dataset_root()
-    target_file_path = os.path.join(_dataset_root, TRAINING_DATASET_FILE)
+    target_file_path = os.path.join(_dataset_root, training_dataset)
     if not os.path.isfile(target_file_path):
         raise FileNotFoundError(f"Dataset training file cannot be found : {target_file_path}")
     logging.info(f"Loading dataset from {target_file_path}")
@@ -177,7 +176,7 @@ def run_training(settings: Settings) -> None:
     model, tokenizer = load_model_from_hf(model_name=settings.model_name, device_map=device, use_bf16=bf16_supported)
 
     # Load Dataset
-    formatted_dataset = load_and_format_dataset(tokenizer)
+    formatted_dataset = load_and_format_dataset(tokenizer, settings.training_set)
 
     # Run Lora training
     train(

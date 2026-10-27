@@ -17,14 +17,17 @@ def test_load_and_format_dataset_file_not_found(tmp_path, monkeypatch):
     mock_tokenizer = MagicMock()
 
     with pytest.raises(FileNotFoundError, match="Dataset training file cannot be found"):
-        training.trainer.load_and_format_dataset(mock_tokenizer)
+        training.trainer.load_and_format_dataset(mock_tokenizer, str(tmp_path))
 
 
 def test_load_and_format_dataset_success(tmp_path, monkeypatch):
     """Verify JSONL rows are parsed and formatted using chat template."""
+
+    training_dataset_file = "mock_training_dataset.jsonl"
+
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    file_path = data_dir / training.trainer.TRAINING_DATASET_FILE
+    file_path = data_dir / training_dataset_file
 
     sample_rows = [
         {"messages": [{"role": "user", "content": "How do I invest?"}, {"role": "assistant", "content": "Start with an index fund."}]},
@@ -39,7 +42,7 @@ def test_load_and_format_dataset_success(tmp_path, monkeypatch):
     mock_tokenizer = MagicMock()
     mock_tokenizer.apply_chat_template.side_effect = lambda msgs, tokenize=False: f"<formatted>{msgs[1]['content']}</formatted>"
 
-    dataset = training.trainer.load_and_format_dataset(mock_tokenizer)
+    dataset = training.trainer.load_and_format_dataset(mock_tokenizer, training_dataset_file)
 
     assert isinstance(dataset, Dataset)
     assert len(dataset) == 2
@@ -199,11 +202,14 @@ def test_train_fallback_signature_on_type_error(mock_sft_config, mock_sft_traine
 @patch("training.trainer.get_device", return_value="cuda")
 def test_run_training_pipeline(mock_get_device, mock_bf16, mock_load_model, mock_load_data, mock_train):
     """Test full training pipeline integration with mocked subroutines."""
+    training_dataset_file = "mock_training_dataset.jsonl"
+
     mock_settings = MagicMock()
     mock_settings.model_name = "mistral-7b"
     mock_settings.learning_rate = 1e-4
     mock_settings.nb_epochs = 3
     mock_settings.report_training = "none"
+    mock_settings.training_set = training_dataset_file
 
     mock_model = MagicMock()
     mock_tokenizer = MagicMock()
@@ -214,7 +220,7 @@ def test_run_training_pipeline(mock_get_device, mock_bf16, mock_load_model, mock
     training.trainer.run_training(mock_settings)
 
     mock_load_model.assert_called_once_with(model_name="mistral-7b", device_map="cuda", use_bf16=True)
-    mock_load_data.assert_called_once_with(mock_tokenizer)
+    mock_load_data.assert_called_once_with(mock_tokenizer, training_dataset_file)
     mock_train.assert_called_once_with(
         lr=1e-4,
         nb_epochs=3,
