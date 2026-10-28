@@ -16,7 +16,6 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Build Docker Image
-        # We tag it with the Commit SHA (for precise versioning) AND 'latest'
         run: |
           IMAGE_ID=${{ secrets.DOCKER_USERNAME }}/conseiller-financier-training-app
           
@@ -24,8 +23,6 @@ jobs:
           docker tag $IMAGE_ID:${{ github.sha }} $IMAGE_ID:latest
 
       - name: Run Tests in Docker
-        # We test the EXACT image we just built. 
-        # If this fails, we never push to Docker Hub.
         run: |
           IMAGE_ID=${{ secrets.DOCKER_USERNAME }}/conseiller-financier-training-app
           
