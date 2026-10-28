@@ -112,7 +112,7 @@ def test_score_perplexity_empty_dataset(dummy_settings, mock_dependencies, caplo
     with patch("builtins.open", mock_open(read_data="")):
         score_perplexity(dummy_settings)
 
-    assert "Aucun token cible évalué." in caplog.text
+    assert "0 tokens evaluated" in caplog.text
 
 
 def test_score_perplexity_dict_tokenizer_output(dummy_settings, mock_dependencies, mock_dataset_content):
