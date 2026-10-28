@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
+RUN pip install --upgrade pip
+
 COPY requirements.txt .
 
 RUN echo "===== CHECKING REQUIREMENTS =====" && \
@@ -19,4 +21,4 @@ RUN echo "===== CHECKING REQUIREMENTS =====" && \
 COPY . .
 
 ENV PYTHONPATH=/app
-CMD ["python", "app/src/main.py"]
+CMD ["python", "src/main.py"]
