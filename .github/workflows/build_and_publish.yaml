@@ -1,13 +1,13 @@
 name: Continuous Training Pipeline
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  repository_dispatch:
-    types: [trigger-training]
   workflow_dispatch:
+      inputs:
+        trigger_dag:
+          description: 'Trigger the Airflow DAG ?'
+          required: false
+          type: boolean
+          default: true
 
 jobs:
   # ==============================================================================
@@ -58,7 +58,7 @@ jobs:
   # ==============================================================================
   trigger-airflow:
     needs: build-and-push
-    if: github.ref == 'refs/heads/main'
+    if: inputs.trigger_dag == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
