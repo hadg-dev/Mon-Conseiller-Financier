@@ -222,3 +222,7 @@ __marimo__/
 
 # custom
 output/
+z_misc/
+z_airflow/
+z_old/
+

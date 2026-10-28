@@ -34,6 +34,8 @@ Here is the full list:
     👉 Needed to run Airflow locally
     Docker Compose install guide: https://docs.docker.com/compose/install
 
+ code → CI tests → containerization → orchestration → remote training → tracking → teardown.
+
 setup process
 https://app.jedha.co/course/m04-d03-continuous-training-ail/mlflow-server-to-huggingface-ail
 https://app.jedha.co/course/m04-d03-continuous-training-ail/training-script-and-github-action-ail
