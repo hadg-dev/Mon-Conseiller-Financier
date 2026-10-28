@@ -43,22 +43,21 @@ def score_perplexity(settings: Settings) -> None:
             # read fields from record
             messages = item['messages']
 
-            # 1. Tokenisation du prompt (contexte avant la dernière réponse assistant)
-            # On isole la dernière réponse pour ne calculer la loss que dessus
+            # 1. Tokenize prompt - isolate last answer to calculate loss only on it
             context_messages = messages[:-1]
             prompt_encoded = tokenizer.apply_chat_template(
                 context_messages,
                 add_generation_prompt=True,
                 return_tensors="pt"
             )
-            # Selon la version, apply_chat_template renvoie soit un Tensor direct, soit un BatchEncoding/dict
+
             prompt_ids = (
                 prompt_encoded["input_ids"]
                 if isinstance(prompt_encoded, dict) or hasattr(prompt_encoded, "data")
                 else prompt_encoded
             ).to(device)
 
-            # 2. Tokenisation du message complet
+            # 2. Tokenize full message
             full_encoded = tokenizer.apply_chat_template(
                 messages,
                 add_generation_prompt=False,
@@ -70,14 +69,14 @@ def score_perplexity(settings: Settings) -> None:
                 else full_encoded
             ).to(device)
 
-            # 3. Récupération sûre de la longueur du prompt
+            # 3. get prompt len
             prompt_len = prompt_ids.shape[1]
 
-            # 3. Masquage du prompt avec -100
+            # 3. mask prompt with -100
             labels = full_ids.clone()
             labels[:, :prompt_len] = -100
 
-            # 4. Inférence avec les mêmes longueurs de tenseurs
+            # 4. run inference
             outputs = model(input_ids=full_ids, labels=labels)
             loss = outputs.loss
 
@@ -88,7 +87,7 @@ def score_perplexity(settings: Settings) -> None:
                 total_tokens += target_tokens
 
     if total_tokens == 0:
-        logging.error("Aucun token cible évalué.")
+        logging.error("0 tokens evaluated")
         return
 
     mean_nll = total_nll / total_tokens
