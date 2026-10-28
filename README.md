@@ -34,8 +34,8 @@ uv run pytest
 - **dataset/**
 - **doc/**
 - **docker/** Docker file for training image
-- **src/** Python scripts
-  - **src/airflow/trigger_airflow.py** triggered by github action to send image hash to Airflow  
+- **scripts/trigger_airflow.py** triggered by github action to send image hash to Airflow
+- **src/** Python project
   - **src/dataset/fetch_dataset.py** fetching dataset function
   - **src/training/trainer.py** training function
   - **src/validation/judge.py** score model using LLM-as-judge
