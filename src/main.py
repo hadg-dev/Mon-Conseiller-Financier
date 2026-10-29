@@ -12,7 +12,7 @@ def manage_mlflow(_settings: Settings) -> None:
             raise ValueError("report training to mlflow but mlflow_tracking_uri missing")
         else:
             mlflow.set_tracking_uri(_settings.mlflow_tracking_uri)
-            mlflow.set_experiment(_settings.experiment_name)
+            mlflow.set_experiment(_settings.mlflow_experiment_id)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

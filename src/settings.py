@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # reporting
     report_training: str = conf.defaults.report_training_to
     mlflow_tracking_uri: str | None = os.getenv("MLFLOW_TRACKING_URI")
-    experiment_name: str = os.getenv("EXPERIMENT_NAME", "mon_conseiller_financier")
+    mlflow_experiment_id: str = os.getenv("MLFLOW_EXPERIMENT_ID", "mon_conseiller_financier")
     # Training settings
     nb_epochs: int = conf.defaults.nb_epochs
     model_name: str = conf.defaults.model_name
