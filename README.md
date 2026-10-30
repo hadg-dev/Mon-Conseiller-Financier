@@ -14,6 +14,7 @@ Set env variable `STEPS` to a comma-separated list of required steps to execute 
 - `train` : train model
 - `score_perplexity` : score perplexity of trained model
 - `score_with_llm` : score trained model using LLM-as-judge
+- `copy_s3` : copy trained model to S3
 
 Running the training script :
 ```commandline
