@@ -68,6 +68,7 @@ Training script overrides :
 
 |   Variable name          |       Description                   |  Default |
 |--------------------------|-------------------------------------|----------|
+| STEPS                    | training steps to run               | dataset,train,score_perplexity,score_with_llm     |
 | DEBUG                    | Provides additional logging         | True     |
 | REPORT_TRAINING          | "mlflow", "none", "all"             | none     |
 | NB_EPOCHS                | Number of epochs to train           | 4        |
