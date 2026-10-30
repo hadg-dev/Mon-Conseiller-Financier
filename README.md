@@ -48,6 +48,7 @@ uv run pytest
 * [Airflow.md](doc/Airflow.md) : setting up and configuring the local Airflow instance
 * [Github_Action.md](doc/Github_Action.md) : env variables for Github Actions
 * [Training_script_overrides.md](doc/Training_script_overrides.md) : env variables overrides for the training script
+* [Misc.md](doc/Misc.md) : misc env variables
 
 ## Architecture
 
