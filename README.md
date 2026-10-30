@@ -16,7 +16,7 @@ Set env variable `STEPS` to a comma-separated list of required steps to execute 
 - `score_with_llm` : score trained model using LLM-as-judge
 - `copy_s3` : copy trained model to S3
 
-Running the training script :
+Running the training script locally :
 ```commandline
 uv run ./src/main.py
 ```
