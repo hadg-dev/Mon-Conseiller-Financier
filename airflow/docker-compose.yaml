@@ -333,5 +333,19 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+ # Patch - adding NGROK service to Airflow
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: always
+    network_mode: host
+    command:
+      - "http"
+      - "8080"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    depends_on:
+      airflow-apiserver:
+        condition: service_healthy
+
 volumes:
   postgres-db-volume:

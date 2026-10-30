@@ -5,6 +5,7 @@ from training.trainer import run_training
 from dataset.fetch_dataset import fetch_dataset_from_hf
 from validation.judge import score_with_llm
 from validation.perplexity import score_perplexity
+from aws.upload_adapter import upload_folder_to_s3
 
 def manage_mlflow(_settings: Settings) -> None:
     if _settings.report_training == "mlflow":
@@ -25,7 +26,7 @@ if __name__ == "__main__":
         "train": lambda: run_training(settings),
         "score_perplexity": lambda: score_perplexity(settings),
         "score_with_llm": lambda: score_with_llm(settings),
-        #"copy": TODO copy lora to S3
+        "copy_s3": lambda: upload_folder_to_s3(settings),
     }
 
     requested_steps = set(settings.steps) if settings.steps else set(steps_factory.keys())

@@ -30,3 +30,8 @@ class Settings(BaseSettings):
     repo_id: str = conf.dataset.repo_id
     training_set: str = conf.dataset.training_set
     validation_set: str = conf.dataset.validation_set
+    # AWS S3
+    aws_access_key_id: str | None = os.getenv("AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: str | None = os.getenv("AWS_SECRET_ACCESS_KEY")
+    artifact_store_uri: str | None = os.getenv("ARTIFACT_STORE_URI")
+    aws_default_region: str = os.getenv("AWS_DEFAULT_REGION", "eu-west-3")

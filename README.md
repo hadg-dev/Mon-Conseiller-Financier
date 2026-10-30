@@ -43,39 +43,12 @@ uv run pytest
   - **src/main.py** main entrypoint
 - **tests/** 
 
-## Environment Variables
+## Configuration of the industrialization pipeline
 
-|   Variable name                                       |       Description             |
-|-------------------------------------------------------|-------------------------------|
-| AWS_ACCESS_KEY_ID=your_access_key_id                  |   AWS access key              |
-| AWS_SECRET_ACCESS_KEY=your_secret_access_key          | AWS secret access key         |
-| ARTIFACT_STORE_URI=s3://mlflow-artifacts-demo-1234    | S3 bucket url                 |
-| BACKEND_STORE_URI=postgresql://user:password@hostname/dbname  | Postgres backend url  |
-| PORT=7860                                             | MLFlow Hugging Face app port  |  
-| MLFLOW_TRACKING_URI                                   | MLFlow tracking               |
-| MLFLOW_EXPERIMENT_ID                                  | MLFlow experiment ID          |
-| AIRFLOW_URL                                           | Airflow URL                   |
-| AIRFLOW_USER                                          | Airflow user                  |
-| AIRFLOW_PASS                                          | Airflow password              |
-| DAG_ID                                                | Airflow DAG ID                |
-| DOCKER_USERNAME                                       | Docker Hub username           |
-| DOCKER_PASSWORD                                       | Docker Hub password           |
-| PERSONAL_ACCESS_TOKEN                                 | Github access token           |     
-| OPENAI_API_KEY                                        | OpenAi key for validation     |
-| STEPS | training script steps to run; default 'dataset,train,score_perplexity,score_with_llm'     |
+* [Airflow.md](doc/Airflow.md) : setting up and configuring the local Airflow instance
+* [Github_Action.md](doc/Github_Action.md) : env variables for Github Actions
+* [Training_script_overrides.md](doc/Training_script_overrides.md) : env variables overrides for the training script
 
-Training script overrides :
-
-|   Variable name          |       Description                   |  Default |
-|--------------------------|-------------------------------------|----------|
-| STEPS                    | training steps to run               | dataset,train,score_perplexity,score_with_llm     |
-| DEBUG                    | Provides additional logging         | True     |
-| REPORT_TRAINING          | "mlflow", "none", "all"             | none     |
-| NB_EPOCHS                | Number of epochs to train           | 4        |
-| MODEL_NAME               | Training model                      | "Qwen/Qwen3.5-4B" |
-| LEARNING_RATE            | Traning learning rate               | 2e-4     |
-| REPO_ID                  | HF Training dataset                 | "likhitjuttada/finance-reasoning-sft-dataset" |
-
-## Industrialization pipeline
+## Architecture
 
 ![Schema](M06-MLOps.png)

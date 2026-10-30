@@ -34,10 +34,16 @@ INSTANCE_TYPE = os.getenv("INSTANCE_TYPE", "t3.small")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 REGION_NAME = os.getenv("AWS_DEFAULT_REGION", "eu-west-3")
+ARTIFACT_STORE_URI = os.getenv("ARTIFACT_STORE_URI")
 
 # MLFlow Config
+REPORT_TRAINING = os.getenv("REPORT_TRAINING", "mlflow")
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
-MLFLOW_EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "california_housing")
+MLFLOW_EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "mon_conseiller_financier")
+
+# overrides
+NB_EPOCHS = os.getenv("NB_EPOCHS", 1)
+STEPS = os.getenv("STEPS", "train,score_perplexity,copy_s3")
 
 # User Data (Install Docker + MLflow)
 USER_DATA_SCRIPT = """#!/bin/bash
@@ -243,13 +249,16 @@ with DAG(
 
             # 3. Run Training
             cmd = f"""
+                export REPORT_TRAINING={REPORT_TRAINING}
                 export MLFLOW_TRACKING_URI={MLFLOW_TRACKING_URI}
                 export MLFLOW_EXPERIMENT_NAME={MLFLOW_EXPERIMENT_NAME}
                 export AWS_ACCESS_KEY_ID={AWS_ACCESS_KEY_ID}
                 export AWS_SECRET_ACCESS_KEY={AWS_SECRET_ACCESS_KEY}
                 export AWS_DEFAULT_REGION={REGION_NAME}
+                export ARTIFACT_STORE_URI={ARTIFACT_STORE_URI}
+                export NB_EPOCHS={NB_EPOCHS}
+                export STEPS={STEPS}
                 
-
                 echo "🔍 VERIFYING MLFLOW INSTALLATION:"
                 which mlflow
                 
