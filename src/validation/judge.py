@@ -138,5 +138,5 @@ def score_with_llm(settings: Settings):
     if settings.report_training == "mlflow":
         mlflow.log_metrics({
             "judge/scored_samples": len(scores)/sample_size,
-            "perplexity/average_score": avg_score,
+            "judge/average_score": avg_score,
         })
