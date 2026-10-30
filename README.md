@@ -37,6 +37,7 @@ uv run pytest
 - **docker/** Docker file for training image
 - **scripts/trigger_airflow.py** triggered by github action to send image hash to Airflow
 - **src/** Python project
+  - **src/aws/upload_adapter.py** copy lora adapter to S3 
   - **src/dataset/fetch_dataset.py** fetching dataset function
   - **src/training/trainer.py** training function
   - **src/validation/judge.py** score model using LLM-as-judge
