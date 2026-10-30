@@ -201,7 +201,11 @@ with DAG(
         if not key_content:
             raise ValueError("SSH_PRIVATE_KEY_CONTENT is missing!")
 
-        ssh_key = paramiko.RSAKey.from_private_key(io.StringIO(key_content))
+        #ssh_key = paramiko.RSAKey.from_private_key(io.StringIO(key_content))
+        ssh_key = paramiko.RSAKey.from_private_key_file(
+            "/opt/airflow/airflow-training-key.pem"
+        )
+
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
