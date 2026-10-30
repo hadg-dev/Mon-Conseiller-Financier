@@ -8,6 +8,7 @@ from peft import PeftModel
 from settings import Settings
 from utils.file_utils import dataset_root, output_root
 from utils.torch_utils import get_device
+import mlflow
 
 def score_perplexity(settings: Settings) -> None:
     logging.info(f"\n--- Scoring model on perplexity ---")
@@ -97,3 +98,11 @@ def score_perplexity(settings: Settings) -> None:
     logging.info(f"evaluated tokens : {total_tokens}")
     logging.info(f"negative mean Log-Likelihood : {mean_nll:.4f}")
     logging.info(f"perplexity (PPL) : {perplexity:.2f}")
+
+    if settings.report_training == "mlflow":
+        mlflow.log_metrics({
+            "perplexity/total_tokens": total_tokens,
+            "perplexity/negative_mean_nll": mean_nll,
+            "perplexity/perplexity_score": perplexity,
+        })
+

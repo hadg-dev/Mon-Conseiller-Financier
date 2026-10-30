@@ -10,6 +10,7 @@ from settings import Settings
 from utils.file_utils import dataset_root, output_root
 from utils.torch_utils import get_device
 from openai import OpenAI
+import mlflow
 
 JUDGE_MODEL = "gpt-4o-mini"
 
@@ -129,6 +130,13 @@ def score_with_llm(settings: Settings):
             scores.append(score)
 
     avg_score = sum(scores) / len(scores) if scores else 0
+
     logging.info(f"\n--- Results ---")
     logging.info(f"Number of scored samples : {len(scores)}/{sample_size}")
     logging.info(f"Average score : {avg_score:.2f} / 5")
+
+    if settings.report_training == "mlflow":
+        mlflow.log_metrics({
+            "judge/scored_samples": len(scores)/sample_size,
+            "perplexity/average_score": avg_score,
+        })
