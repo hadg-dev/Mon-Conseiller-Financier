@@ -26,7 +26,6 @@ class Settings(BaseSettings):
     nb_epochs: int = conf.defaults.nb_epochs
     model_name: str = conf.defaults.model_name
     learning_rate: float = conf.defaults.learning_rate
-    max_steps: int = -1  # -1 runs all the epochs
     # Dataset settings
     repo_id: str = conf.dataset.repo_id
     training_set: str = conf.dataset.training_set

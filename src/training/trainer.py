@@ -104,8 +104,7 @@ def train(
         training_dataset: Dataset,
         report_training: str,
         use_bf16: bool,
-        use_fp16: bool,
-        max_steps: int = -1
+        use_fp16: bool
 ) -> None:
 
     lora_config = LoraConfig(
@@ -127,7 +126,8 @@ def train(
         optim="paged_adamw_8bit",
         learning_rate=lr,
         num_train_epochs=nb_epochs,
-        max_steps=max_steps,
+        # -1 runs all the epochs
+        max_steps=int(os.getenv("MAX_STEPS", -1)),
         # max_seq_length=1536,
         max_length=1536,
         dataset_text_field="text",
@@ -190,5 +190,4 @@ def run_training(settings: Settings) -> None:
         report_training=settings.report_training,
         use_bf16=bf16_supported,
         use_fp16=fp16_supported,
-        max_steps=settings.max_steps,
     )
