@@ -45,8 +45,7 @@ jobs:
             python -m pytest tests/
 
       - name: Push to Docker Hub
-        # Only push if tests passed AND we are on the main branch
-        if: github.ref == 'refs/heads/main'
+        # Only reached if tests passed; the workflow is started manually, from any branch
         run: |
           IMAGE_ID=${{ secrets.DOCKER_USERNAME }}/conseiller-financier-training-app
           
