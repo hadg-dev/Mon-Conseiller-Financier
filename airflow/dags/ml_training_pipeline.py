@@ -4,7 +4,8 @@ import requests
 import base64
 import os
 import paramiko
-import io
+import re
+import shlex
 from datetime import datetime, timedelta
 from airflow.sdk import task
 from airflow.models.dag import DAG
@@ -22,7 +23,10 @@ from airflow.task.trigger_rule import TriggerRule
 GITHUB_REPO = os.getenv("GITHUB_REPO") 
 # User changed env var name to GITHUB_PAT, updating here:
 GITHUB_TOKEN = os.getenv("GITHUB_PAT") 
-BRANCH_NAME = "main"
+BRANCH_NAME = os.getenv("BRANCH_NAME", "main")
+
+# Docker Config
+DOCKER_IMAGE = os.getenv("DOCKER_IMAGE")
 
 # AWS Config
 KEY_PAIR_NAME = os.getenv("KEY_PAIR_NAME") 
@@ -40,12 +44,16 @@ ARTIFACT_STORE_URI = os.getenv("ARTIFACT_STORE_URI")
 REPORT_TRAINING = os.getenv("REPORT_TRAINING", "mlflow")
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
 MLFLOW_EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "mon_conseiller_financier")
+# Only needed when the MLflow Space is private
+MLFLOW_TRACKING_TOKEN = os.getenv("MLFLOW_TRACKING_TOKEN")
 
 # overrides
 NB_EPOCHS = os.getenv("NB_EPOCHS", 1)
 STEPS = os.getenv("STEPS", "train,score_perplexity,copy_s3")
+# Tiny model to test the pipeline on a small instance; real model: Qwen/Qwen3.5-4B
+MODEL_NAME = os.getenv("MODEL_NAME", "trl-internal-testing/tiny-Qwen2ForCausalLM-2.5")
 
-# User Data (Install Docker + MLflow)
+# User Data (Install Docker)
 USER_DATA_SCRIPT = """#!/bin/bash
 # 1. Redirect all output to a dedicated log file for easy debugging
 exec > /var/log/user-data-debug.log 2>&1
@@ -59,7 +67,7 @@ export DEBIAN_FRONTEND=noninteractive
 # 3. Install System Dependencies
 echo "--> Installing Apt Packages..."
 apt-get update
-apt-get install -y docker.io git python3-pip python3-venv
+apt-get install -y docker.io
 
 # 4. Configure Docker
 echo "--> Configuring Docker..."
@@ -70,13 +78,12 @@ usermod -aG docker ubuntu
 while [ ! -S /var/run/docker.sock ]; do echo "Waiting for Docker Socket..."; sleep 1; done
 chmod 666 /var/run/docker.sock
 
-# 5. Install MLflow (The dangerous part)
-echo "--> Installing Python Libs..."
-# BYPASS UBUNTU PROTECTIONS
-sudo -u ubuntu pip3 install mlflow boto3 --break-system-packages
-
-# This makes 'mlflow' callable from anywhere, even non-interactive shells.
-ln -s /home/ubuntu/.local/bin/mlflow /usr/bin/mlflow
+# 5. Add swap, small instances run out of memory while loading the libraries
+echo "--> Adding Swap..."
+fallocate -l 4G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
 
 # 6. Signal Success
 echo "--> SETUP COMPLETE"
@@ -160,6 +167,8 @@ with DAG(
             "KeyName": KEY_PAIR_NAME,
             "SecurityGroupIds": [SECURITY_GROUP_ID] if SECURITY_GROUP_ID else [],
             "UserData": base64.b64encode(USER_DATA_SCRIPT.encode("ascii")).decode("ascii"),
+            # The default 8 GB root disk cannot hold the training image
+            "BlockDeviceMappings": [{'DeviceName': '/dev/sda1', 'Ebs': {'VolumeSize': 30, 'VolumeType': 'gp3', 'DeleteOnTermination': True}}],
             "TagSpecifications": [{'ResourceType': 'instance', 'Tags': [{'Key': 'Name', 'Value': 'Airflow-Trainer'}]}]
         },
         wait_for_completion=True
@@ -191,17 +200,22 @@ with DAG(
         return instance.public_ip_address
 
     # ------------------------------------------------------------------
-    # TASK 5: Run Training (SSH with Memory Key)
+    # TASK 5: Run Training (SSH with mounted key)
     # ------------------------------------------------------------------
     @task
-    def run_training_via_ssh(public_ip):
+    def run_training_via_ssh(public_ip, dag_run=None):
         print(f"🔌 Connecting to {public_ip}...")
-        
-        key_content = os.getenv("SSH_PRIVATE_KEY_CONTENT")
-        if not key_content:
-            raise ValueError("SSH_PRIVATE_KEY_CONTENT is missing!")
 
-        #ssh_key = paramiko.RSAKey.from_private_key(io.StringIO(key_content))
+        if not DOCKER_IMAGE:
+            raise ValueError("DOCKER_IMAGE is missing!")
+
+        # GitHub Actions sends the commit hash; manual runs use the latest image
+        image_tag = (dag_run.conf or {}).get("git_hash", "latest")
+        # The tag comes from the API and ends up in a remote shell command
+        if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", str(image_tag)):
+            raise ValueError(f"Invalid git_hash: {image_tag!r}")
+        image = f"{DOCKER_IMAGE}:{image_tag}"
+
         ssh_key = paramiko.RSAKey.from_private_key_file(
             "/opt/airflow/airflow-training-key.pem"
         )
@@ -219,21 +233,19 @@ with DAG(
                     print(f"Waiting for SSH... ({e})")
                     time.sleep(10)
 
-            # 2. Wait for MLflow installation to be usable
-            print("⏳ Waiting for MLflow installation to be usable...")
-            
-            # We loop until python can successfully import mlflow.
-            # This prevents the "No module named mlflow" error.
+            # 2. Wait for the User Data script to finish installing Docker
+            print("⏳ Waiting for Docker installation to finish...")
+
             wait_cmd = """
             for i in {1..60}; do
-                if python3 -c "import mlflow" > /dev/null 2>&1; then
-                    echo "✅ Python found MLflow!"
+                if [ -f /tmp/airflow_ready ]; then
+                    echo "✅ Docker is ready!"
                     exit 0
                 fi
-                echo "Waiting for library..."
+                echo "Waiting for setup..."
                 sleep 5
             done
-            echo "❌ Timed out waiting for MLflow lib"
+            echo "❌ Timed out waiting for setup"
             exit 1
             """
             
@@ -252,39 +264,48 @@ with DAG(
             print(stdout.read().decode())
 
             # 3. Run Training
+            container_env = {
+                "REPORT_TRAINING": REPORT_TRAINING,
+                "MLFLOW_TRACKING_URI": MLFLOW_TRACKING_URI,
+                # settings.py reads the experiment name from MLFLOW_EXPERIMENT_ID
+                "MLFLOW_EXPERIMENT_ID": MLFLOW_EXPERIMENT_NAME,
+                "AWS_ACCESS_KEY_ID": AWS_ACCESS_KEY_ID,
+                "AWS_SECRET_ACCESS_KEY": AWS_SECRET_ACCESS_KEY,
+                "AWS_DEFAULT_REGION": REGION_NAME,
+                "ARTIFACT_STORE_URI": ARTIFACT_STORE_URI,
+                "NB_EPOCHS": NB_EPOCHS,
+                "STEPS": STEPS,
+                "MODEL_NAME": MODEL_NAME,
+            }
+            if MLFLOW_TRACKING_TOKEN:
+                container_env["MLFLOW_TRACKING_TOKEN"] = MLFLOW_TRACKING_TOKEN
+
+            exports = "\n".join(f"export {name}={shlex.quote(str(value))}" for name, value in container_env.items())
+            env_flags = " ".join(f"-e {name}" for name in container_env)
+
             cmd = f"""
-                export REPORT_TRAINING={REPORT_TRAINING}
-                export MLFLOW_TRACKING_URI={MLFLOW_TRACKING_URI}
-                export MLFLOW_EXPERIMENT_NAME={MLFLOW_EXPERIMENT_NAME}
-                export AWS_ACCESS_KEY_ID={AWS_ACCESS_KEY_ID}
-                export AWS_SECRET_ACCESS_KEY={AWS_SECRET_ACCESS_KEY}
-                export AWS_DEFAULT_REGION={REGION_NAME}
-                export ARTIFACT_STORE_URI={ARTIFACT_STORE_URI}
-                export NB_EPOCHS={NB_EPOCHS}
-                export STEPS={STEPS}
-                
-                echo "🔍 VERIFYING MLFLOW INSTALLATION:"
-                which mlflow
-                
-                echo "🚀 Starting MLflow Run..."
-                python3 -m mlflow run https://github.com/{GITHUB_REPO} \
-                    --version {BRANCH_NAME} \
-                    --build-image
-            """
-            
+set -e
+{exports}
+
+echo {shlex.quote(f"📥 Pulling {image}...")}
+docker pull {shlex.quote(image)}
+
+echo "🚀 Starting Training..."
+docker run --rm {env_flags} {shlex.quote(image)}
+"""
+
             stdin, stdout, stderr = ssh.exec_command(cmd)
-            
+            # Training logs go to stderr; reading them with stdout keeps the SSH buffer from filling up
+            stdout.channel.set_combine_stderr(True)
+
             for line in iter(stdout.readline, ""):
                 print(line, end="")
-            
+
             if stdout.channel.recv_exit_status() != 0:
                 print("\n❌ REMOTE SCRIPT FAILED. LOGS FROM USER_DATA:")
-                # Dump the setup log to see why pip failed
-                _, log_out, _ = ssh.exec_command("cat /var/log/user-data.log")
+                _, log_out, _ = ssh.exec_command("cat /var/log/user-data-debug.log")
                 print(log_out.read().decode())
-                
-                print("\n❌ STDERR:")
-                print(stderr.read().decode())
+
                 raise Exception("Training Failed")
                 
         finally:

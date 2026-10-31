@@ -1,7 +1,7 @@
 defaults:
     nb_epochs: 4
     learning_rate: 2e-4
-    model_name: "Qwen/Qwen3.5-4B"  # Qwen/Qwen3.5-9B , Qwen/Qwen3.8-27B
+    model_name: "trl-internal-testing/tiny-Qwen2ForCausalLM-2.5"  # Qwen/Qwen3.5-4B , Qwen/Qwen3.5-9B , Qwen/Qwen3.8-27B
     report_training_to: "none" # "mlflow", "none", "all"
 dataset:
     repo_id: "likhitjuttada/finance-reasoning-sft-dataset"

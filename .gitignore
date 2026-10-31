@@ -154,11 +154,14 @@ activemq-data/
 .env
 .envrc
 .venv
+*.pem
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+*mise.toml
+*DS_STORE
 
 # Spyder project settings
 .spyderproject
