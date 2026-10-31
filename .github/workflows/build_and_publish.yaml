@@ -30,7 +30,12 @@ jobs:
         run: |
           IMAGE_ID=${{ secrets.DOCKER_USERNAME }}/conseiller-financier-training-app
           
-          docker build -f docker/Dockerfile -t $IMAGE_ID:${{ github.sha }} .
+          # Reuses the layers of the last pushed image, to avoid reinstalling the requirements
+          docker build \
+            --cache-from $IMAGE_ID:latest \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            -f docker/Dockerfile \
+            -t $IMAGE_ID:${{ github.sha }} .
           docker tag $IMAGE_ID:${{ github.sha }} $IMAGE_ID:latest
 
       - name: Run Tests in Docker
