@@ -21,4 +21,5 @@ RUN echo "===== CHECKING REQUIREMENTS =====" && \
 COPY . .
 
 ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
 CMD ["python", "src/main.py"]

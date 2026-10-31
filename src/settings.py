@@ -1,5 +1,5 @@
 import os
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 from configuration.config import load_config
 
@@ -26,12 +26,13 @@ class Settings(BaseSettings):
     nb_epochs: int = conf.defaults.nb_epochs
     model_name: str = conf.defaults.model_name
     learning_rate: float = conf.defaults.learning_rate
+    max_steps: int = -1  # -1 runs all the epochs
     # Dataset settings
     repo_id: str = conf.dataset.repo_id
     training_set: str = conf.dataset.training_set
     validation_set: str = conf.dataset.validation_set
     # AWS S3
-    aws_access_key_id: str | None = os.getenv("AWS_ACCESS_KEY_ID")
-    aws_secret_access_key: str | None = os.getenv("AWS_SECRET_ACCESS_KEY")
+    aws_access_key_id: str | None = Field(default=os.getenv("AWS_ACCESS_KEY_ID"), repr=False)
+    aws_secret_access_key: str | None = Field(default=os.getenv("AWS_SECRET_ACCESS_KEY"), repr=False)
     artifact_store_uri: str | None = os.getenv("ARTIFACT_STORE_URI")
     aws_default_region: str = os.getenv("AWS_DEFAULT_REGION", "eu-west-3")

@@ -49,6 +49,8 @@ MLFLOW_TRACKING_TOKEN = os.getenv("MLFLOW_TRACKING_TOKEN")
 
 # overrides
 NB_EPOCHS = os.getenv("NB_EPOCHS", 1)
+# Short training to test the pipeline; -1 runs all the epochs
+MAX_STEPS = os.getenv("MAX_STEPS", 5)
 STEPS = os.getenv("STEPS", "train,score_perplexity,copy_s3")
 # Tiny model to test the pipeline on a small instance; real model: Qwen/Qwen3.5-4B
 MODEL_NAME = os.getenv("MODEL_NAME", "trl-internal-testing/tiny-Qwen2ForCausalLM-2.5")
@@ -104,6 +106,8 @@ with DAG(
     schedule=None,  # <--- FIX: Changed from schedule_interval to schedule
     default_args=default_args,
     catchup=False,
+    # Only runs when triggered, so it doesn't need the manual unpause
+    is_paused_upon_creation=False,
     tags=['github', 'ec2', 'ml-training'],
 ) as dag:
 
@@ -274,6 +278,7 @@ with DAG(
                 "AWS_DEFAULT_REGION": REGION_NAME,
                 "ARTIFACT_STORE_URI": ARTIFACT_STORE_URI,
                 "NB_EPOCHS": NB_EPOCHS,
+                "MAX_STEPS": MAX_STEPS,
                 "STEPS": STEPS,
                 "MODEL_NAME": MODEL_NAME,
             }
