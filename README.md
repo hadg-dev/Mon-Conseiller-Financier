@@ -97,8 +97,53 @@ By default the DAG only tests the pipeline on a small CPU instance : it trains a
 
 The training set is versioned with [DVC](https://dvc.org). Git keeps a small pointer file (`dataset/combined_train.jsonl.dvc`) with the hash of the data, and S3 keeps the data itself. A `data-v*` git tag marks each version. The validation set stays in Git, so scores stay comparable between versions.
 
-Get the training set locally :
+### Where the data is
+
+| Location | Content | Role |
+|---|---|---|
+| Hugging Face (`likhitjuttada/finance-reasoning-sft-dataset`) | Original training and validation sets | Source of D0. The pipeline doesn't read it : the optional `dataset` step is not in the DAG's `STEPS` |
+| Git | `combined_val.jsonl`, `additions.jsonl`, `combined_train.jsonl.dvc` | Validation set, test rows, and the pointer to each training set version |
+| S3 (`s3://<bucket>/dvc/files/md5/...`) | One full copy of each training set version, named by its hash | Reference storage, read by the training on EC2 |
+| Your machine (`dataset/combined_train.jsonl`) | The version you last pulled, ignored by Git | To create new versions and run locally. `.dvc/cache/` keeps a copy of each version you used |
+| EC2 container (`/app/dataset/`) | The training set of the requested version, and the validation set from the image | Deleted with the container after each run |
+
+### How the data reaches the model
+
+1. The DAG receives `data_version` and passes it to the container as `DATA_VERSION`.
+2. The `dataset_version` step runs `dvc get` : it reads the pointer file at that git tag on GitHub, then downloads the matching file from S3 to `/app/dataset/combined_train.jsonl`.
+3. It records the version, md5 hash and row count in MLflow.
+4. The `train` step loads the file with pandas, and `load_and_format_dataset` turns each row into one text : a fixed system prompt, then the user question and the assistant answer, formatted with the model's chat template.
+5. `SFTTrainer` tokenizes these texts, truncates them to 1536 tokens, and feeds them to the model in batches to train the LoRA adapter.
+6. The `score_perplexity` step scores the adapter on `combined_val.jsonl`, which comes from the image.
+
+### DVC basics
+
+DVC works alongside Git : Git versions the pointer file, DVC moves the data. DVC needs AWS credentials, for example `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in the environment.
+
+| Command | What it does |
+|---|---|
+| `dvc add <file>` | Hashes the file, copies it to the local cache and updates its `.dvc` pointer file |
+| `dvc push` | Uploads the cached versions to S3 |
+| `dvc pull` | Downloads the version the current pointer file refers to |
+| `dvc status -c` | Compares the local cache with S3 |
+| `dvc diff <rev-a> <rev-b>` | Lists the tracked files that changed between two git revisions |
+| `dvc get <repo-url> <path> --rev <tag>` | Downloads one file from a repo at a given tag, without cloning it. The training uses this |
+| `dvc remote list` | Shows the configured S3 location |
+
+Get the training set after cloning the repo :
 ```commandline
+dvc pull
+```
+
+Go back to an older version locally :
+```commandline
+git checkout data-v0 -- dataset/combined_train.jsonl.dvc
+dvc pull
+```
+
+Return to the current version :
+```commandline
+git checkout HEAD -- dataset/combined_train.jsonl.dvc
 dvc pull
 ```
 
