@@ -84,9 +84,9 @@ docker compose stop ngrok
 ### How it works
 
 1. **Github Actions** builds the training image, runs the tests inside it, and pushes it to Docker Hub tagged with the commit hash and `latest`.
-2. **`scripts/trigger_airflow.py`** logs in to Airflow through the ngrok tunnel and starts the DAG `github_ec2_ml_training`, passing the commit hash.
+2. **`scripts/trigger_airflow.py`** logs in to Airflow through the ngrok tunnel and starts the DAG `github_ec2_ml_training`, passing the image tag and the dataset version.
 3. **Airflow** checks the latest CI run on `BRANCH_NAME`, creates an EC2 instance and waits for it to be ready.
-4. **Airflow connects to the instance over SSH**, pulls the image for that commit hash and runs the container with the training configuration.
+4. **Airflow connects to the instance over SSH**, pulls that image and runs the container with the training configuration.
 5. **The container** downloads the requested dataset version with DVC, trains the model, then runs the steps listed in `STEPS`. It sends metrics to the MLflow server (`MLFLOW_TRACKING_URI`) and copies the adapter to S3 (`ARTIFACT_STORE_URI`).
 6. **MLflow** stores run data in its Postgres database (Neon) and artifacts in S3.
 7. **Airflow terminates the instance**, even if training failed.
@@ -147,27 +147,64 @@ git checkout HEAD -- dataset/combined_train.jsonl.dvc
 dvc pull
 ```
 
-### Retraining on new data
+## Updating the model
 
-Update the file, then publish a new version. Pushing the tag retrains the model, without building the image :
+Airflow and ngrok must be running in both cases, and `AIRFLOW_URL` must match the current ngrok URL.
+
+| | Code change | Dataset change |
+|---|---|---|
+| **What starts it** | `gh workflow run` | `git push origin data-vN` |
+| **Image build and tests** | Yes | No |
+| **Image used** | The one built for that commit | `latest`, the last image built |
+| **Dataset used** | The newest `data-v*` tag | The pushed tag |
+
+Each MLflow run records the base model, the dataset version, its hash and row count, and the S3 path of the adapter.
+
+### 1. When you push a code change
+
+A `git push` alone starts nothing : the build is started by hand, and needs at least one `data-v*` tag to train on.
+
+```commandline
+git add <files>
+git commit -m "Describe the change"
+git push
+gh workflow run build_and_publish.yaml --ref <branch> -f trigger_dag=true
+gh run watch
+```
+
+Steps :
+1. **Github Actions** builds the image, runs the tests inside it, and pushes it to Docker Hub. If the tests fail, the pipeline stops here.
+2. **The workflow** finds the newest `data-v*` tag, and `scripts/trigger_airflow.py` starts the DAG through ngrok with the commit hash and that dataset version.
+3. **Airflow** creates an EC2 instance, which pulls the image for that commit.
+4. **The container** downloads the dataset version with DVC, trains the model, scores it, and copies the adapter to S3.
+5. **Airflow** terminates the instance.
+
+To build the image without training, use `-f trigger_dag=false`.
+
+### 2. When you push a dataset change
+
+Update `dataset/combined_train.jsonl`, then publish a new version. DVC needs AWS credentials (see DVC basics).
+
 ```commandline
 dvc add dataset/combined_train.jsonl
 git add dataset/combined_train.jsonl.dvc
-git commit -m "Add new training data"
-git tag data-v3
+git commit -m "Describe the new data"
+git tag data-vN
 dvc push
 git push
-git push origin data-v3
+git push origin data-vN
 ```
 
-Run `dvc push` before pushing the tag, otherwise the training can't find the data. Airflow and ngrok must be running.
+Replace `data-vN` with the next version, e.g. `data-v3`. Run `dvc push` before pushing the tag, otherwise the training can't find the data.
 
-| Event | Image build | Image used | Dataset used |
-|---|---|---|---|
-| `gh workflow run` (code change) | Yes | That commit's image | Newest `data-v*` tag |
-| `git push origin data-vN` (new data) | No | `latest` | That tag |
+Steps :
+1. **Pushing the tag** starts the Github workflow, which skips the image build.
+2. **`scripts/trigger_airflow.py`** starts the DAG through ngrok with `latest` as the image and the tag as the dataset version.
+3. **Airflow** creates an EC2 instance, which pulls the `latest` image.
+4. **The container** reads the pointer file at that tag on GitHub, downloads the matching file from S3, trains the model, scores it, and copies the adapter to S3.
+5. **Airflow** terminates the instance.
 
-Each MLflow run records the base model, the dataset version, its hash and row count, and the S3 path of the adapter.
+In both cases, the Github run ends once the DAG is triggered. Follow the training in the Airflow UI (http://localhost:8080), and check that `run_training_via_ssh` is green : the DAG run shows success even when training fails, because its last task is the instance termination.
 
 ## Chatting with the trained model
 
