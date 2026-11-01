@@ -16,6 +16,7 @@ USERNAME = os.getenv("AIRFLOW_USER")
 PASSWORD = os.getenv("AIRFLOW_PASS")
 DAG_ID = os.getenv("DAG_ID", "github_ec2_ml_training")
 GIT_HASH = sys.argv[1] if len(sys.argv) > 1 else "main"
+DATA_VERSION = sys.argv[2] if len(sys.argv) > 2 else None
 
 if not AIRFLOW_URL:
     logging.info("❌ Error: AIRFLOW_URL env var is missing")
@@ -78,7 +79,7 @@ def trigger_dag(token):
 
     payload = {
         "logical_date": current_time,
-        "conf": {"git_hash": GIT_HASH},
+        "conf": {"git_hash": GIT_HASH, "data_version": DATA_VERSION},
         "note": "Triggered via GitHub Actions CI"
     }
     try:

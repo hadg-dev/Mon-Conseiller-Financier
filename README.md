@@ -87,11 +87,68 @@ docker compose stop ngrok
 2. **`scripts/trigger_airflow.py`** logs in to Airflow through the ngrok tunnel and starts the DAG `github_ec2_ml_training`, passing the commit hash.
 3. **Airflow** checks the latest CI run on `BRANCH_NAME`, creates an EC2 instance and waits for it to be ready.
 4. **Airflow connects to the instance over SSH**, pulls the image for that commit hash and runs the container with the training configuration.
-5. **The container** trains the model, then runs the steps listed in `STEPS`. It sends metrics to the MLflow server (`MLFLOW_TRACKING_URI`) and copies the adapter to S3 (`ARTIFACT_STORE_URI`).
+5. **The container** downloads the requested dataset version with DVC, trains the model, then runs the steps listed in `STEPS`. It sends metrics to the MLflow server (`MLFLOW_TRACKING_URI`) and copies the adapter to S3 (`ARTIFACT_STORE_URI`).
 6. **MLflow** stores run data in its Postgres database (Neon) and artifacts in S3.
 7. **Airflow terminates the instance**, even if training failed.
 
 By default the DAG only tests the pipeline on a small CPU instance : it trains a tiny model (`trl-internal-testing/tiny-Qwen2ForCausalLM-2.5`) for 5 steps, and its scores are not meaningful. For real training, set `MODEL_NAME` (e.g. `Qwen/Qwen3.5-4B`) and `MAX_STEPS=-1` in `airflow/.env`, and set `INSTANCE_TYPE` and `AMI_ID` to a GPU instance.
+
+## Dataset versions
+
+The training set is versioned with [DVC](https://dvc.org). Git keeps a small pointer file (`dataset/combined_train.jsonl.dvc`) with the hash of the data, and S3 keeps the data itself. A `data-v*` git tag marks each version. The validation set stays in Git, so scores stay comparable between versions.
+
+Get the training set locally :
+```commandline
+dvc pull
+```
+
+### Retraining on new data
+
+Update the file, then publish a new version. Pushing the tag retrains the model, without building the image :
+```commandline
+dvc add dataset/combined_train.jsonl
+git add dataset/combined_train.jsonl.dvc
+git commit -m "Add new training data"
+git tag data-v3
+dvc push
+git push
+git push origin data-v3
+```
+
+Run `dvc push` before pushing the tag, otherwise the training can't find the data. Airflow and ngrok must be running.
+
+| Event | Image build | Image used | Dataset used |
+|---|---|---|---|
+| `gh workflow run` (code change) | Yes | That commit's image | Newest `data-v*` tag |
+| `git push origin data-vN` (new data) | No | `latest` | That tag |
+
+Each MLflow run records the base model, the dataset version, its hash and row count, and the S3 path of the adapter.
+
+## Chatting with the trained model
+
+`src/utils/gradio_chat.py` is a chat UI that loads the base model and a trained adapter. It runs on CPU or GPU.
+
+Find the latest training folder on S3 and download its adapter :
+```commandline
+aws s3 ls s3://<bucket>/
+aws s3 sync s3://<bucket>/<timestamp> output/adapter
+```
+
+Start the UI, then open http://localhost:7860 :
+```commandline
+docker run -d --rm --name gradio-chat \
+  -p 127.0.0.1:7860:7860 \
+  -v "$PWD/output/adapter:/app/output/adapter:ro" \
+  <docker-id>/conseiller-financier-training-app:latest \
+  python src/utils/gradio_chat.py
+```
+
+Stop it :
+```commandline
+docker stop gradio-chat
+```
+
+`MODEL_NAME` must be the model the adapter was trained on. It defaults to the tiny test model, whose answers are gibberish; a real adapter needs `-e MODEL_NAME=Qwen/Qwen3.5-4B` and a GPU.
 
 ## Architecture
 

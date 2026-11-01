@@ -1,6 +1,11 @@
 name: Continuous Training Pipeline
 
 on:
+  # New dataset version : retrain without building the image
+  push:
+    tags:
+      - 'data-v*'
+  # Code change : build the image, then train on the newest dataset version
   workflow_dispatch:
       inputs:
         trigger_dag:
@@ -14,6 +19,7 @@ jobs:
   # JOB 1: BUILD, TEST & PUSH (The "Artifact Factory")
   # ==============================================================================
   build-and-push:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -62,11 +68,19 @@ jobs:
   # ==============================================================================
   trigger-airflow:
     needs: build-and-push
-    if: inputs.trigger_dag == true
+    # !cancelled() : otherwise this job is skipped too when the build is skipped
+    if: >-
+      !cancelled() && (
+      (github.event_name == 'push' && needs.build-and-push.result == 'skipped') ||
+      (inputs.trigger_dag == true && needs.build-and-push.result == 'success')
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+        with:
+          # Fetches the tags, to find the newest dataset version
+          fetch-depth: 0
+
       - name: Install Python Dependencies
         run: pip install requests
 
@@ -76,6 +90,23 @@ jobs:
           AIRFLOW_USER: ${{ secrets.AIRFLOW_USERNAME }}
           AIRFLOW_PASS: ${{ secrets.AIRFLOW_PASSWORD }}
           DAG_ID: "github_ec2_ml_training"
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          # Run the python script, passing the commit hash as an argument
-          python scripts/trigger_airflow.py ${{ github.sha }}
+          if [ "$EVENT_NAME" = "push" ]; then
+            # No image was built for this commit : use the last one, with the pushed dataset version
+            IMAGE_TAG=latest
+            DATA_VERSION="$REF_NAME"
+          else
+            IMAGE_TAG="$COMMIT_SHA"
+            DATA_VERSION=$(git tag --list 'data-v*' --sort=-version:refname | head -n 1)
+          fi
+
+          if [ -z "$DATA_VERSION" ]; then
+            echo "::error::No data-v* tag found, push a dataset version first"
+            exit 1
+          fi
+
+          # Run the python script, passing the image tag and the dataset version as arguments
+          python scripts/trigger_airflow.py "$IMAGE_TAG" "$DATA_VERSION"

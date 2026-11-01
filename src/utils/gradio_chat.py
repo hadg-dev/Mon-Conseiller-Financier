@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 from threading import Thread
 import gradio as gr
 from peft import PeftModel
@@ -9,8 +11,9 @@ from transformers import (
     TextIteratorStreamer,
 )
 
-TRAINED_LORA_DIR = "../../output/adapter"
-MODEL_NAME = "Qwen/Qwen3.5-4B"
+TRAINED_LORA_DIR = os.getenv("ADAPTER_DIR", str(Path(__file__).resolve().parents[2] / "output" / "adapter"))
+# Must be the model the adapter was trained on; real model: Qwen/Qwen3.5-4B
+MODEL_NAME = os.getenv("MODEL_NAME", "trl-internal-testing/tiny-Qwen2ForCausalLM-2.5")
 
 SYSTEM_PROMPT = """
 You are an expert, empathetic, and highly analytical Personal Financial Advisor. Your mission is to help the user master their money, optimize their budget, eliminate debt, invest wisely, and build long-term wealth.
@@ -25,25 +28,33 @@ Operational Directives:
 
 
 print("Loading tokenizer and base model...")
+# The adapter folder on S3 has no tokenizer, the one of the base model is used
 tokenizer = AutoTokenizer.from_pretrained(
-    TRAINED_LORA_DIR, trust_remote_code=True
+    MODEL_NAME, trust_remote_code=True
 )
 
-# Load in 4-bit to minimize VRAM footprint during local inference
-bnb_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.bfloat16
-    if torch.cuda.is_bf16_supported()
-    else torch.float16,
-)
+if torch.cuda.is_available():
+    # Load in 4-bit to minimize VRAM footprint during local inference
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16
+        if torch.cuda.is_bf16_supported()
+        else torch.float16,
+    )
 
-base_model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME,
-    quantization_config=bnb_config,
-    device_map="auto",
-    trust_remote_code=True,
-)
+    base_model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME,
+        quantization_config=bnb_config,
+        device_map="auto",
+        trust_remote_code=True,
+    )
+else:
+    base_model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME,
+        device_map="cpu",
+        trust_remote_code=True,
+    )
 
 print(f"Attaching LoRA adapter from {TRAINED_LORA_DIR}...")
 model = PeftModel.from_pretrained(base_model, TRAINED_LORA_DIR)
@@ -65,7 +76,11 @@ def chat_stream(
     # Convert Gradio history into OpenAI/HF role-content format
     for item in history:
         if isinstance(item, dict):
-            messages.append({"role": item["role"], "content": item["content"]})
+            content = item["content"]
+            # Gradio sends the history as a list of text blocks
+            if isinstance(content, list):
+                content = "".join(block.get("text", "") for block in content)
+            messages.append({"role": item["role"], "content": content})
         elif isinstance(item, (list, tuple)):
             messages.append({"role": "user", "content": item[0]})
             if item[1] is not None:
@@ -110,19 +125,13 @@ def chat_stream(
 # Gradio Chat Interface
 demo = gr.ChatInterface(
     fn=chat_stream,
-    type="messages",
     title="Finance Reasoning Assistant",
     description="Interactive chat interface with your fine-tuned financial reasoning LoRA adapter.",
     examples=[
-        "A company has EBITDA of $12M, debt of $40M, and cash of $4M. Compute net debt and leverage ratio.",
-        "Explain the difference between Enterprise Value and Equity Value step-by-step.",
+        ["A company has EBITDA of $12M, debt of $40M, and cash of $4M. Compute net debt and leverage ratio.", 0.2, 512],
+        ["Explain the difference between Enterprise Value and Equity Value step-by-step.", 0.2, 512],
     ],
     additional_inputs=[
-        gr.Textbox(
-            value="You are a financial reasoning assistant. Provide logical, stepwise reasoning before concluding your answer.",
-            label="System Prompt",
-            lines=2,
-        ),
         gr.Slider(
             minimum=0.0,
             maximum=1.0,

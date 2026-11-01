@@ -7,7 +7,7 @@ import paramiko
 import re
 import shlex
 from datetime import datetime, timedelta
-from airflow.sdk import task
+from airflow.sdk import Param, task
 from airflow.models.dag import DAG
 from airflow.providers.amazon.aws.operators.ec2 import (
     EC2CreateInstanceOperator,
@@ -51,7 +51,7 @@ MLFLOW_TRACKING_TOKEN = os.getenv("MLFLOW_TRACKING_TOKEN")
 NB_EPOCHS = os.getenv("NB_EPOCHS", 1)
 # Short training to test the pipeline; -1 runs all the epochs
 MAX_STEPS = os.getenv("MAX_STEPS", 5)
-STEPS = os.getenv("STEPS", "train,score_perplexity,copy_s3")
+STEPS = os.getenv("STEPS", "dataset_version,train,score_perplexity,copy_s3")
 # Tiny model to test the pipeline on a small instance; real model: Qwen/Qwen3.5-4B
 MODEL_NAME = os.getenv("MODEL_NAME", "trl-internal-testing/tiny-Qwen2ForCausalLM-2.5")
 
@@ -108,6 +108,16 @@ with DAG(
     catchup=False,
     # Only runs when triggered, so it doesn't need the manual unpause
     is_paused_upon_creation=False,
+    # One training instance at a time; a second trigger waits
+    max_active_runs=1,
+    params={
+        # Required, no default: each run must say which dataset it trains on
+        "data_version": Param(
+            type="string",
+            pattern=r"^data-v[0-9]+$",
+            description="Dataset version to train on, a data-v* git tag (e.g. data-v1)",
+        ),
+    },
     tags=['github', 'ec2', 'ml-training'],
 ) as dag:
 
@@ -207,7 +217,7 @@ with DAG(
     # TASK 5: Run Training (SSH with mounted key)
     # ------------------------------------------------------------------
     @task
-    def run_training_via_ssh(public_ip, dag_run=None):
+    def run_training_via_ssh(public_ip, dag_run=None, params=None):
         print(f"🔌 Connecting to {public_ip}...")
 
         if not DOCKER_IMAGE:
@@ -281,6 +291,8 @@ with DAG(
                 "MAX_STEPS": MAX_STEPS,
                 "STEPS": STEPS,
                 "MODEL_NAME": MODEL_NAME,
+                "DATA_VERSION": params["data_version"],
+                "DATA_REPO": GITHUB_REPO,
             }
             if MLFLOW_TRACKING_TOKEN:
                 container_env["MLFLOW_TRACKING_TOKEN"] = MLFLOW_TRACKING_TOKEN

@@ -2,7 +2,7 @@ import logging
 from settings import Settings
 import mlflow
 from training.trainer import run_training
-from dataset.fetch_dataset import fetch_dataset_from_hf
+from dataset.fetch_dataset import fetch_dataset_from_hf, fetch_dataset_version
 from validation.judge import score_with_llm
 from validation.perplexity import score_perplexity
 from aws.upload_adapter import upload_folder_to_s3
@@ -23,6 +23,7 @@ if __name__ == "__main__":
 
     steps_factory = {
         "dataset": lambda: fetch_dataset_from_hf(settings),
+        "dataset_version": lambda: fetch_dataset_version(settings),
         "train": lambda: run_training(settings),
         "score_perplexity": lambda: score_perplexity(settings),
         "score_with_llm": lambda: score_with_llm(settings),
@@ -45,9 +46,17 @@ if __name__ == "__main__":
     # setup MLFlow
     manage_mlflow(settings)
 
-    # execute steps
-    for step in selected_steps:
-        logging.info(f"Executing step: {step}")
-        steps_factory[step]()
+    def execute_steps() -> None:
+        for step in selected_steps:
+            logging.info(f"Executing step: {step}")
+            steps_factory[step]()
+
+    # execute steps, all in the same MLFlow run
+    if settings.report_training == "mlflow":
+        with mlflow.start_run():
+            mlflow.log_param("base_model", settings.model_name)
+            execute_steps()
+    else:
+        execute_steps()
 
     logging.info(f"Script done")

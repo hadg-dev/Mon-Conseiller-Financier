@@ -1,5 +1,6 @@
 import logging
 import boto3
+import mlflow
 from botocore.config import Config
 from settings import Settings
 from concurrent.futures import ThreadPoolExecutor
@@ -79,6 +80,9 @@ def upload_folder_to_s3(settings: Settings, max_workers: int = 8):
             logging.info(f"  ✓ {uploaded_key}")
 
     logging.info("upload completed !")
+
+    if settings.report_training == "mlflow":
+        mlflow.log_param("adapter_s3_uri", destination_uri)
 
 #if __name__ == "__main__":
 #    upload_folder_to_s3()

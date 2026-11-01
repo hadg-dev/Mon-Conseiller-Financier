@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     repo_id: str = conf.dataset.repo_id
     training_set: str = conf.dataset.training_set
     validation_set: str = conf.dataset.validation_set
+    # Dataset version : DVC reads the data-v* tag from this GitHub repo (owner/name)
+    data_version: str | None = os.getenv("DATA_VERSION")
+    data_repo: str | None = os.getenv("DATA_REPO")
     # AWS S3
     aws_access_key_id: str | None = Field(default=os.getenv("AWS_ACCESS_KEY_ID"), repr=False)
     aws_secret_access_key: str | None = Field(default=os.getenv("AWS_SECRET_ACCESS_KEY"), repr=False)
