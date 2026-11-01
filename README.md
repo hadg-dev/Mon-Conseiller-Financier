@@ -51,6 +51,7 @@ uv run pytest
 * [Github_Action.md](doc/Github_Action.md) : env variables for Github Actions
 * [Training_script_overrides.md](doc/Training_script_overrides.md) : env variables overrides for the training script
 * [Misc.md](doc/Misc.md) : misc env variables
+* [DVC-Guide.md](doc/DVC-Guide.md) : versioning the training set with DVC
 
 ## Running the full pipeline
 
@@ -97,6 +98,8 @@ By default the DAG only tests the pipeline on a small CPU instance : it trains a
 
 The training set is versioned with [DVC](https://dvc.org). Git keeps a small pointer file (`dataset/combined_train.jsonl.dvc`) with the hash of the data, and S3 keeps the data itself. A `data-v*` git tag marks each version. The validation set stays in Git, so scores stay comparable between versions.
 
+For how DVC works and its commands, read the [DVC guide](doc/DVC-Guide.md). After cloning the repo, run `dvc pull` to get the training set.
+
 ### Where the data is
 
 | Location | Content | Role |
@@ -116,37 +119,6 @@ The training set is versioned with [DVC](https://dvc.org). Git keeps a small poi
 5. `SFTTrainer` tokenizes these texts, truncates them to 1536 tokens, and feeds them to the model in batches to train the LoRA adapter.
 6. The `score_perplexity` step scores the adapter on `combined_val.jsonl`, which comes from the image.
 
-### DVC basics
-
-DVC works alongside Git : Git versions the pointer file, DVC moves the data. DVC needs AWS credentials, for example `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in the environment.
-
-| Command | What it does |
-|---|---|
-| `dvc add <file>` | Hashes the file, copies it to the local cache and updates its `.dvc` pointer file |
-| `dvc push` | Uploads the cached versions to S3 |
-| `dvc pull` | Downloads the version the current pointer file refers to |
-| `dvc status -c` | Compares the local cache with S3 |
-| `dvc diff <rev-a> <rev-b>` | Lists the tracked files that changed between two git revisions |
-| `dvc get <repo-url> <path> --rev <tag>` | Downloads one file from a repo at a given tag, without cloning it. The training uses this |
-| `dvc remote list` | Shows the configured S3 location |
-
-Get the training set after cloning the repo :
-```commandline
-dvc pull
-```
-
-Go back to an older version locally :
-```commandline
-git checkout data-v0 -- dataset/combined_train.jsonl.dvc
-dvc pull
-```
-
-Return to the current version :
-```commandline
-git checkout HEAD -- dataset/combined_train.jsonl.dvc
-dvc pull
-```
-
 ## Updating the model
 
 Airflow and ngrok must be running in both cases, and `AIRFLOW_URL` must match the current ngrok URL.
@@ -165,10 +137,15 @@ Each MLflow run records the base model, the dataset version, its hash and row co
 A `git push` alone starts nothing : the build is started by hand, and needs at least one `data-v*` tag to train on.
 
 ```commandline
+# Commit and push the code; this starts nothing
 git add <files>
 git commit -m "Describe the change"
 git push
+
+# Build the image, run the tests, then start the training
 gh workflow run build_and_publish.yaml --ref <branch> -f trigger_dag=true
+
+# Follow the Github run
 gh run watch
 ```
 
@@ -183,19 +160,44 @@ To build the image without training, use `-f trigger_dag=false`.
 
 ### 2. When you push a dataset change
 
-Update `dataset/combined_train.jsonl`, then publish a new version. DVC needs AWS credentials (see DVC basics).
+Update `dataset/combined_train.jsonl`, then publish a new version. DVC needs the AWS keys loaded (see the [DVC guide](doc/DVC-Guide.md#installation)).
 
 ```commandline
+# Check the number of rows in the updated file
+wc -l dataset/combined_train.jsonl
+
+# Take the snapshot and update the pointer file with the new hash
 dvc add dataset/combined_train.jsonl
+
+# Commit the pointer file; the data itself doesn't go in Git
 git add dataset/combined_train.jsonl.dvc
 git commit -m "Describe the new data"
+
+# Name this version
 git tag data-vN
+
+# Upload the data to S3, before pushing the tag
 dvc push
+
+# Push the commit; this starts nothing
 git push
+
+# Push the tag; this starts the training
 git push origin data-vN
+
+# Check the Github run started
+gh run list --limit 2
 ```
 
 Replace `data-vN` with the next version, e.g. `data-v3`. Run `dvc push` before pushing the tag, otherwise the training can't find the data.
+
+The test versions were created this way, from the original 651 rows in `data-v0` :
+
+| Version | Rows | Update before `dvc add` |
+|---|---|---|
+| `data-v0` | 651 | None |
+| `data-v1` | 661 | `sed -n '1,10p' dataset/additions.jsonl >> dataset/combined_train.jsonl` |
+| `data-v2` | 671 | `sed -n '11,20p' dataset/additions.jsonl >> dataset/combined_train.jsonl` |
 
 Steps :
 1. **Pushing the tag** starts the Github workflow, which skips the image build.
