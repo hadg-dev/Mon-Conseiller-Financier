@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 from threading import Thread
+
 import gradio as gr
-from peft import PeftModel
 import torch
+from peft import PeftModel
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -11,7 +12,9 @@ from transformers import (
     TextIteratorStreamer,
 )
 
-TRAINED_LORA_DIR = os.getenv("ADAPTER_DIR", str(Path(__file__).resolve().parents[2] / "output" / "adapter"))
+TRAINED_LORA_DIR = os.getenv(
+    "ADAPTER_DIR", str(Path(__file__).resolve().parents[2] / "output" / "adapter")
+)
 # Must be the model the adapter was trained on; real model: Qwen/Qwen3.5-4B
 MODEL_NAME = os.getenv("MODEL_NAME", "trl-internal-testing/tiny-Qwen2ForCausalLM-2.5")
 
@@ -29,18 +32,16 @@ Operational Directives:
 
 print("Loading tokenizer and base model...")
 # The adapter folder on S3 has no tokenizer, the one of the base model is used
-tokenizer = AutoTokenizer.from_pretrained(
-    MODEL_NAME, trust_remote_code=True
-)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 
 if torch.cuda.is_available():
     # Load in 4-bit to minimize VRAM footprint during local inference
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16
-        if torch.cuda.is_bf16_supported()
-        else torch.float16,
+        bnb_4bit_compute_dtype=(
+            torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        ),
     )
 
     base_model = AutoModelForCausalLM.from_pretrained(
@@ -50,9 +51,11 @@ if torch.cuda.is_available():
         trust_remote_code=True,
     )
 else:
+    # Full precision: CPUs without native bfloat16 support were about 3x slower in bfloat16
     base_model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         device_map="cpu",
+        dtype=torch.float32,
         trust_remote_code=True,
     )
 
@@ -65,12 +68,12 @@ print("Model loaded successfully.")
 def chat_stream(
     message: str,
     history: list,
-    #system_prompt: str,
+    # system_prompt: str,
     temperature: float,
     max_new_tokens: int,
 ):
     """Formats conversation history using the chat template and yields tokens in real time."""
-    #messages = [{"role": "system", "content": system_prompt}]
+    # messages = [{"role": "system", "content": system_prompt}]
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     # Convert Gradio history into OpenAI/HF role-content format
@@ -94,8 +97,9 @@ def chat_stream(
     inputs = tokenizer(prompt_text, return_tensors="pt").to(model.device)
 
     # Streamer to capture output tokens incrementally
+    # On CPU, a large model can take several minutes to read the prompt before its first token
     streamer = TextIteratorStreamer(
-        tokenizer, timeout=60.0, skip_prompt=True, skip_special_tokens=True
+        tokenizer, timeout=600.0, skip_prompt=True, skip_special_tokens=True
     )
 
     generation_kwargs = dict(
@@ -128,8 +132,16 @@ demo = gr.ChatInterface(
     title="Finance Reasoning Assistant",
     description="Interactive chat interface with your fine-tuned financial reasoning LoRA adapter.",
     examples=[
-        ["A company has EBITDA of $12M, debt of $40M, and cash of $4M. Compute net debt and leverage ratio.", 0.2, 512],
-        ["Explain the difference between Enterprise Value and Equity Value step-by-step.", 0.2, 512],
+        [
+            "A company has EBITDA of $12M, debt of $40M, and cash of $4M. Compute net debt and leverage ratio.",
+            0.2,
+            512,
+        ],
+        [
+            "Explain the difference between Enterprise Value and Equity Value step-by-step.",
+            0.2,
+            512,
+        ],
     ],
     additional_inputs=[
         gr.Slider(
